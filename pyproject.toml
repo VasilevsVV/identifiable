@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "identifiable"
+version = "0.1.0"
+
+authors = [
+    {name = "Vasyl Tsiura", email = "morfey.rulit@gmail.com"}
+]
+maintainers = [
+    {name = "Vasyl Tsiura", email = "morfey.rulit@gmail.com"}
+]
+
+readme = "README.md"
+requires-python = ">=3.10.12"
+keywords = [
+    "pattern", "class", "unique", "managing", "mixin"]
+license = {text = "GNU GENERAL PUBLIC LICENSE"}
+
+
+dependencies = []
+
+
+[project.urls]
+Homepage = "https://github.com/VasilevsVV/identifiable"
+Issues = "https://github.com/VasilevsVV/identifiable/issues"
+
+
+[tool.pyright]
+
+typeCheckingMode = "standard"
+
+
+# =================================================================
+#           TESTING
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+
+pythonpath = [
+    "trent"
+]
+testpaths = [
+    "test"
+]
+python_files = [
+    'test_*.py', 
+    '*_test.py'
+]
+python_functions = [
+    'test_*',
+    '*_test'
+    ]
