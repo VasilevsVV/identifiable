@@ -35,6 +35,28 @@ Changing `__new__`, `__init_subclass__` or the registry affects every subclass: 
 - Always access the registry as `cls.__class_objects_map__`, never through `Identifiable` directly.
 - Write a test for the current subclass behaviour first, then change it.
 
+## Plans and step-by-step execution
+
+**Plan format**
+- Split every plan into small steps. Each step is one reviewable change: one concern, a few files, a small diff.
+- Every plan includes a steps table:
+
+  | # | Step | Status | Commit |
+  |---|------|--------|--------|
+  | 1 | Short description | ⬜ pending | — |
+
+  Statuses are ⬜ pending, 🔄 in progress and ✅ done. Commit is the short hash, filled in once the step is committed.
+
+**Execution loop**: run this for each step.
+1. Implement **one** step only.
+2. Update its status in the table, report what changed, then **stop and wait** for the developer's "go".
+3. On "go", commit the step with a short conventional-commit message, record the hash in the table, then start the next step.
+4. Any other reply (feedback or a question) means revise the current step. Don't commit and don't continue.
+
+**Tests**: if the project has tests, offer to run them every couple of steps, or once at the end for a short plan. Before declaring the plan finished, run the full Definition of done.
+
+**Autonomous mode**: work through all steps without stopping **only** when the developer explicitly says to. Use the same loop and treat each step as having received "go": still one commit per step, and the table is still updated. Never assume autonomous mode.
+
 ## Tooling
 
 | Purpose | Tool | Config |
