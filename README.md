@@ -1,2 +1,2 @@
 # identifiable
-Implementation of Identifiably template for python (v12+)
+Implementation of the Identifiable pattern (mixin) for Python 3.10+
