@@ -1,237 +1,132 @@
 # AGENTS.md
 
-This file is the only operational reference for AI agents working on this repository. Read it fully at the start of every session. Follow every rule in every discussion. Nothing in this file is optional.
+Operational guide for AI agents working on this repository. Read it at the start of every session. Where it conflicts with general practice, this file wins. If a design decision can't be settled from the code or this file, ask the user.
 
 ---
 
-## 📦 Project Overview
+## Project
 
-**Name**: `identifiable`  
-**Version**: 0.1.0  
-**Description**: Implementation of the Identifiably pattern (template/mixin) for Python 3.10+. Provides a mixin class that manages unique object identifiers per subclass, supporting auto-ID generation and a class-level object registry.
+- **Name**: `identifiable` (version 0.1.0, early WIP on the `prototype` branch)
+- **What it is**: a mixin for Python 3.10+. Subclasses get unique per-object IDs (optionally auto-generated) and a class-level registry of instances.
+- **Goal**: a reliable, testable mixin that doesn't surprise subclasses or break inheritance chains.
 
-This is a small, focused Python package designed to be used as a base class/mixin for creating uniquely identifiable model classes.
+## How the code works
 
-**Goal**: Create a reliable, testable mixin that other classes can inherit to automatically maintain a registry of instances with unique IDs — without surprising subclass behavior or breaking inheritance chains.
+Everything lives in `identifiable/main.py`.
 
-**Success**: An agent can read the codebase, make changes, and verify correctness in a single session without human intervention. The code is small enough that depth and locality are achievable. The methodology section below is how that happens reliably.
+- `Identifiable(Generic[_KEY_T])` is the mixin. `_KEY_T` is the ID type (must be `Hashable`).
+- Class flags:
+  - `__enable_auto_id__: bool = False`: when True, `__new__` assigns an ID.
+  - `__id_generation_strategy__: 'increment' | 'uuid' = 'increment'` (`'uuid'` is reserved and not implemented).
+  - `__class_objects_map__: dict` is the registry.
+- `__init_subclass__` only acts on **direct** subclasses (`Identifiable in cls.__bases__`):
+  - It creates a fresh `__class_objects_map__`, or checks that a user-provided one is a `dict`.
+  - If auto-ID is off, the subclass must implement a concrete `uid()`, otherwise it raises.
+  - Deeper subclasses skip all of this and **share their parent's registry**.
+- `__new__` runs when auto-ID is on: it calls `__gen_unique_id()` and attaches a `uid` lambda to the instance.
+- `__register_unique_id`, `__gen_unique_id` and `get_object` are **stubs** (`...`).
+- Names that start with two underscores and don't end with two (for example `__gen_unique_id` and `__unique_id`) are name-mangled to `_Identifiable__*`. Subclasses can't override them by their plain names.
 
----
+## Danger zone
 
-## 🧱 Tech Stack & Tooling
+Changing `__new__`, `__init_subclass__` or the registry affects every subclass: registration, auto-ID and lookups all depend on them.
 
-| Tool | Purpose | Config |
-|------|---------|--------|  
-| Python | >= 3.10.12 | `pyproject.toml` |
-| Build | `setuptools` & `python -m build` | `pyproject.toml` |
-| Lint | `ruff` | `ruff.toml` |
-| Format | `ruff format` | `ruff.toml` |
-| Type Checking | `pyright` | `pyproject.toml[tool.pyright]` |
-| Testing | `pytest` | `pyproject.toml[tool.pytest]` |
+- Ask the user before changing their signatures or behaviour, and use plan mode.
+- Always access the registry as `cls.__class_objects_map__`, never through `Identifiable` directly.
+- Write a test for the current subclass behaviour first, then change it.
+
+## Tooling
+
+| Purpose | Tool | Config |
+|---|---|---|
+| Python | >= 3.10.12 (no 3.11+ features unless asked) | `pyproject.toml` |
+| Build | `setuptools`, `python -m build` | `pyproject.toml`, `makefile` |
+| Lint / format | `ruff` | `ruff.toml` |
+| Types | `pyright` (standard mode) | `pyproject.toml [tool.pyright]` |
+| Tests | `pytest` | `pyproject.toml [tool.pytest.ini_options]` |
 | Versioning | `bump2version` | `.bumpversion.cfg` |
-| Distribution | `twine` | `makefile` |
+| Publishing | `twine` | `makefile` |
 
-## 📁 Project Structure
-
-```
-.
-├── identifiable/          # Source package
-│   ├── __init__.py        # Public exports (currently empty)
-│   └── main.py            # Core Identifiable logic
-├── test/                  # Unit tests (planned)
-├── pyproject.toml         # Project metadata, deps, & tool configs
-├── ruff.toml              # Linting & formatting rules
-├── makefile               # Build & publish shortcuts
-└── .bumpversion.cfg       # Version automation
-```
-
-## 🛠 Development Workflow
-
-### Environment Setup
 ```bash
-# Create a virtual environment (Python 3.10.12+)
-python -m venv .venv
-source .venv/bin/activate
-
-# Install project in editable mode + dev tools
-pip install -e ".[dev]"  # if extras are added later
-pip install build ruff pytest pytest-mock twine
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
 ```
 
-### Lint & Format
+**Definition of done**: run this before reporting work as finished, and report any failures.
+
 ```bash
-# Check & fix linting
-ruff check .
-
-# Format code
-ruff format .
+ruff check . && ruff format --check . && pyright && pytest
 ```
 
-### Run Tests
-```bash
-pytest -v
+`pytest` exits with code 5 while no tests exist. Build and publish with `make build`, `make test-publish` or `make publish`, and only when the user asks.
+
+## Structure
+
 ```
-*(No tests exist yet; use this command once test files are added.)*
-
-### Build Wheel & Source Dist
-```bash
-make build
-```
-
-### Publish
-```bash
-# Test publish to PyPI sandbox
-make test-publish
-
-# Real publish to PyPI
-make publish
+identifiable/
+  __init__.py      # public exports (currently empty)
+  main.py          # Identifiable mixin
+test/              # unit tests (planned): test_*.py or *_test.py
+pyproject.toml  ruff.toml  makefile  .bumpversion.cfg
 ```
 
----
+## Vocabulary
 
-## ⚒ How This File Should Be Used
+Use these terms in design discussions:
 
-### Read it once, internalise it forever
-This is not a first-pass reference. The methodology — the vocabulary, the disciplined loops, the anti-patterns — must become your operating assumptions for this repo. Do not go back to your pre-training general knowledge. **That knowledge does not apply here.** Follow the methodology. The methodology is the boundary condition.
+- **Module**: anything with an interface and an implementation (a class, a method, a package).
+- **Interface**: everything a caller must know: signatures, invariants, error modes, ordering, configuration.
+- **Seam**: a place where behaviour can be changed without editing that place (Feathers). A module's interface sits at its seam.
+- **Adapter**: a concrete thing that satisfies an interface at a seam.
+- **Depth**: behaviour per unit of interface. A deep module has a small interface over a lot of behaviour. A shallow one is about as complex as what it wraps.
+- **Leverage / Locality**: what depth gives callers (more capability for less learning) and maintainers (changes and bugs stay in one place).
 
-### Use the shared vocabulary
-When designing modules, interfaces, or class hierarchies in this repo, use these terms exactly:
+## Working loops
 
-- **Module** — anything with an interface and an implementation. Scale-agnostic: a class, a method, a package.
-- **Interface** — everything a caller must know to use the module: type signatures, invariants, error modes, ordering, configuration.
-- **Seam** — where you alter behaviour without editing that place (Michael Feathers). The module's interface lives at its seam.
-- **Adapter** — a concrete thing that satisfies an interface at a seam. Describes role, not substance.
-- **Depth** — leverage at the interface. A **deep** module has a small interface and lots of behaviour behind it. **Shallow** means the interface is nearly as complex as the implementation.
-- **Leverage** — what callers get from depth. More capability per unit of interface they learn.
-- **Locality** — what maintainers get from depth. Change, bugs, knowledge concentrate in one place.
+**TDD (red → green → refactor)**
+- One vertical slice per cycle: one seam, one failing test, the minimal code to pass it.
+- Test behaviour through public interfaces, not internals. Tests coupled to the implementation break when you refactor.
+- Don't write all the tests up front (horizontal slicing).
+- Refactor at review, not mid-cycle.
 
-Never substitute "API", "component", "service", "boundary", or "unit". Consistent language is the whole point.
+**Debugging**
+- Build a feedback loop before forming any hypothesis: a deterministic, fast test or command that reproduces the exact symptom.
+- Shrink the repro to the minimum, then keep it as a regression test.
+- Tag debug output and remove it before finishing.
 
-### Follow the disciplined loops
+**Prototyping**
+- Before building, state the question the prototype should answer in one visible paragraph.
+- Keep it throwaway: no tests, minimal error handling, in-memory state.
+- Once it answers the question, record the decision, put it into real code, and delete the prototype. Prototype code never merges into `main`.
 
-**TDD (red → green → refactor)**:
-- One vertical slice per cycle. One seam, one test, one minimal implementation.
-- Tests verify behavior through public interfaces, never internals.
-- Red before green. Write the failing test, then only enough code to pass it.
-- Refactoring belongs to the review stage, not the loop cycle.
+## Design rules
 
-**Debugging / diagnosing**:
-- Build a feedback loop first. Never hypothesise before you have a red-capable test or command.
-- A tight loop: deterministic, fast (seconds, not minutes), asserts the exact symptom.
-- Minimise the repro before forming hypotheses. A minimal repro is a regression test.
-- Tag debug logs, cleanup at the end. Never leave them.
+- Prefer deep modules. Use the deletion test: if deleting a module would spread complexity across its callers, it earns its keep. If the complexity would vanish, flatten it.
+- Add behaviour *behind* the `Identifiable` interface, not beside it.
+- Don't add speculative generality. Abstractions, parameters and hooks need a real current use. Don't introduce a port unless at least two adapters justify it.
+- Before writing tests, agree with the user on which public seams they cover.
 
-**Prototyping**:
-- State the question explicitly before building anything. One paragraph. Visible.
-- Build throwaway. No tests, minimal error handling, in-memory state.
-- Once it answers, capture the decision and delete the prototype.
-- Never ship prototype code.
+## Conventions
 
-### Design deep modules
+- **Style**: single quotes, 4-space indent, and the `ruff.toml` rules.
+- **Types**: annotate functions, return types and non-obvious variables. Import `Self` and other newer typing features from `typing_extensions`.
+- **Package**: core logic stays in `main.py`. Export only stable public names from `__init__.py`.
+- **Dependencies**: runtime needs only `typing_extensions`. Ask before adding any other dependency.
+- **Commits**: use conventional commits (`feat:`, `fix:`, `refactor:`, `test:`, `chore:`). Bump versions only in dedicated release PRs.
 
-A deep = small interface + large implementation. The deletion test: imagine deleting the module. If complexity reappears across N call sites, it was earning its keep. If complexity vanishes, it was just passing through — flatten it.
+## Known issues
 
-For this Python project especially: prefer **deep mixins and interfaces** with clear seam placement. The `Identifiable` class is already an interface layer. Add behaviour behind it, not beside it.
+These are documented so they don't get rediscovered. Fix them only when the task calls for it.
 
----
+- `__new__(cls)` takes no arguments, so a subclass whose `__init__` takes arguments fails to instantiate.
+- `__register_unique_id`, `__gen_unique_id` and `get_object` are unimplemented. With auto-ID on, the generated ID is `None`.
+- The error message in `__init_subclass__` says `Profiling ... "execute()"`. It is a copy-paste leftover and should mention `uid()`.
+- Indirect subclasses share their direct parent's registry. It's undecided whether this is intended.
 
-## ⚠ How This File Should NOT Be Used
+## Session checklist
 
-### Do not substitute your general knowledge
-You have extensive general training in software engineering, Python, class design, TDD, and debugging. **That does not apply here.** The methodology in this file is the only methodology. When in doubt, follow the prescribed procedure. Never assume a better approach exists from your pre-training. The procedure is the boundary condition.
-
-### Do not skip phases in any loop
-- **TDD**: do not write implementation before the failing test.
-- **Debugging**: do not hypothesise before building a feedback loop. Phase 1 is the skill. Everything else is mechanical.
-- **Prototyping**: do not add tests, persistence, or abstractions. It is throwaway.
-- **Design**: do not assume decisions. Explore the design tree until the frontier is empty.
-
-Skipping phases is not a shortcut. It is how generic agent-training produces fragile mistakes. The discipline exists to prevent exactly this.
-
-### Do not ship prototype code
-Prototypes are unpolished, untested, and structurally different from production code. Fold the validated decision into real code. Delete the prototype or move it to a throwaway branch. Never merge prototype code into main.
-
-### Do not add speculative generality
-Abstractions, parameters, hooks, and extension points are only valid when a real need shows. If a feature or abstraction exists for an imagined future case, delete it. Inline back until a real use appears.
-
-### Do not create unconfirmed test seams
-Before writing tests, agree on which public seams are under test with the user. You cannot test everything. Pre-agreeing is how effort lands on critical paths, not every edge case.
-
----
-
-## 📝 Code Conventions
-
-### 1. Style
-Single quotes. 4-space indentation. Follow all `ruff.toml` rules. Prefer `typing_extensions` over stdlib `typing` for experimental features (e.g. `Self`).
-
-### 2. Types
-Use `pyright` in standard mode. Annotate functions, return types, and variables. Use `Self` from `typing_extensions` for method chaining and class patterns. Be strict where practical.
-
-### 3. Package structure
-- Keep `Identifiable` logic in `identifiable/main.py`.
-- Export only clean, stable APIs in `identifiable/__init__.py`.
-- Place tests in `test/` directory with `test_*.py` or `*_test.py`.
-- Never add external dependencies unless the user explicitly requests it.
-
-### 4. Commits & versioning
-Use conventional commits: `feat:`, `fix:`, `refactor:`, `test:`, `chore:`. Bump version only in release PRs. Never commit version bumps in the same PR as feature/fix changes.
-
----
-
-## ⚠️ Constraints
-
-### Metaprogramming (the dangerous layer)
-- **Do not modify `__new__` or `__init_subclass__` signatures** without understanding how subclass behavior depends on them. The existing implementation uses these for auto-ID generation and registry setup. Breaking them breaks every subclass.
-- Registry (`__class_objects_map__`) is subclass-scoped. Never access it without `cls.__class_objects_map__`.
-- Auto-ID generation uses `'increment'` by default; `'uuid'` is reserved.
-- All abstract methods and registries must be properly overridden in subclasses.
-
-### Compatibility
-Maintain Python 3.10.12+ only. Do not use 3.11/3.12+ features unless explicitly requested.
-
-### Interface integrity
-- The `Identifiable` mixin must maintain **one seam**: the subclass interface. Adding behaviour beside it, not behind it, is shallow.
-- **One adapter, hypothetical seam.** Do not introduce a port unless two adapters are justified.
-- The interface is the test surface. If you want to test past the interface, the module is the wrong shape.
-
----
-
-## 🚫 Anti-patterns
-
-| Anti-pattern | Why it fails here | What to do instead |
-|-------------|-------------------|-------------------|
-| **Horizontal slicing** | Testing all shapes before understanding behaviour. Tests go insensitive. | Vertical slices: one test → one implementation per cycle. |
-| **Implementation-coupled tests** | Breaks on refactor. Proves internal structure, not correctness. | Test at public seams only. |
-| **Modifying `__new__`/`__init_subclass__` blindly** | Changes subclass registration, auto-ID, and registry — cascading failure. | Understand subclass lifecycle before touching methods of class initialization. |
-| **Speculative generality** | Abstraction for imagined future cases complicates the present. | Inline back until a real need shows. |
-| **Unconfirmed test seams** | Wastes effort on edge cases, misses critical paths. | Pre-agree which public seams are under test. |
-| **Shipping prototype code** | Unpolished, untested, misleading. | Capture the decision. Delete the prototype. |
-| **Skipping the feedback loop in debugging** | Guesswork without a signal. Wastes the agent's context. | Build a tight loop before forming hypotheses. |
-
----
-
-## ✅ Session Checklist
-
-At the start of every session:
-
-1. **Read this file.** Know the methodology, not just the file format.
-2. **Read the full skill document** for any tool you invoke. The skill is not a suggestion.
-3. **Check for project glossaries or decision records** before adopting terminology.
-4. **Identify the seam(s)** under test. Pre-agree with the user before writing tests.
-5. **Build a feedback loop** before debugging. Never skip Phase 1.
-6. **State the question explicitly** before prototyping. One paragraph. Visible.
-7. **Ask clarifying questions** before modifying `__new__`, `__init_subclass__`, or the registry.
-
----
-
-## ⚠️ Agent Notes
-
-- This file is the **only** operational methodology reference for this repo.
-- Do not assume your pre-training on Python class design, mixins, or test-driven development applies beyond the procedures documented here.
-- The `identifiable` package uses advanced metaprogramming. Changing `__new__`, `__init_subclass__`, or the registry is **the highest-risk action** in this repo. Proceed through the checklist.
-- When unsure, default to **explicit over implicit**, **tests over assumptions**, and **depth over shallow pass-through**.
-- If you encounter a design decision that cannot be resolved from the existing code or this file, **ask**.
-
----
-
-*This file is designed to be read by AI agents. It is not a human-facing document. For humans, see `README.md`.*
+1. Read this file.
+2. Identify the seams involved, and agree the test targets with the user before writing tests.
+3. When debugging, build the feedback loop first. When prototyping, state the question first.
+4. Ask before touching anything in the Danger zone.
+5. Run the Definition of done before reporting completion.
