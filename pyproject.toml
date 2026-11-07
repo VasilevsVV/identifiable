@@ -21,7 +21,20 @@ keywords = [
 license = {text = "GNU GENERAL PUBLIC LICENSE"}
 
 
-dependencies = []
+dependencies = [
+    "typing_extensions>=4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "build",
+    "ruff",
+    "pyright",
+    "pytest>=8.0",
+    "pytest-mock",
+    "twine",
+    "bump2version",
+]
 
 
 [project.urls]
@@ -41,7 +54,7 @@ typeCheckingMode = "standard"
 minversion = "8.0"
 
 pythonpath = [
-    "trent"
+    "."
 ]
 testpaths = [
     "test"
