@@ -151,4 +151,5 @@ These are documented so they don't get rediscovered. Fix them only when the task
 2. Identify the seams involved, and agree the test targets with the user before writing tests.
 3. When debugging, build the feedback loop first. When prototyping, state the question first.
 4. Ask before touching anything in the Danger zone.
-5. Run the Definition of done before reporting completion.
+5. For plans, follow the step-by-step execution rules: small steps, a status/commit table, one step at a time, wait for "go", commit after "go".
+6. Run the Definition of done before reporting completion.
