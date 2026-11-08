@@ -9,7 +9,7 @@ import pytest
 
 from identifiable import Identifiable
 
-NOT_IMPLEMENTED = 'increment strategy, registry and get_object are not implemented yet'
+NOT_IMPLEMENTED = 'registry and get_object are not implemented yet'
 
 
 # --- Registry setup ---------------------------------------------------------
@@ -51,65 +51,14 @@ def test_non_dict_registry_is_rejected() -> None:
                 return 'a'
 
 
-# --- uid() requirement ------------------------------------------------------
-
-
-def test_missing_uid_raises_when_auto_id_is_off() -> None:
-    with pytest.raises(TypeError, match=r'must implement uid\(\)'):
-
-        class A(Identifiable[str]):
-            __enable_auto_id__ = False
-
-
-def test_concrete_uid_is_used() -> None:
-    class A(Identifiable[str]):
-        def uid(self) -> str:
-            return 'fixed'
-
-    assert A().uid() == 'fixed'
-
-
-def test_custom_uid_turns_auto_id_off() -> None:
-    class A(Identifiable[str]):
-        def uid(self) -> str:
-            return 'mine'
-
-    assert A.__enable_auto_id__ is False
-    assert A().uid() == 'mine'
-
-
-# --- Auto-ID ----------------------------------------------------------------
-
-
-def test_zero_config_subclass_gets_auto_id() -> None:
-    class A(Identifiable[int]):
-        pass
-
-    assert A.__enable_auto_id__ is True
-    assert callable(A().uid)
-
-
-def test_auto_id_instance_has_callable_uid() -> None:
-    class A(Identifiable[int]):
-        __enable_auto_id__ = True
-
-    assert callable(A().uid)
-
-
-@pytest.mark.xfail(strict=True, reason=NOT_IMPLEMENTED)
-def test_auto_ids_are_increasing_ints() -> None:
-    class A(Identifiable[int]):
-        __enable_auto_id__ = True
-
-    a, b = A(), A()
-    assert isinstance(a.uid(), int)
-    assert b.uid() == a.uid() + 1
+# --- Lookup -----------------------------------------------------------------
 
 
 @pytest.mark.xfail(strict=True, reason=NOT_IMPLEMENTED)
 def test_get_object_returns_registered_instance() -> None:
-    class A(Identifiable[int]):
-        __enable_auto_id__ = True
+    class A(Identifiable[str]):
+        def uid(self) -> str:
+            return 'a'
 
     a = A()
     assert A.get_object(a.uid()) is a
@@ -156,12 +105,12 @@ def test_indirect_subclass_shares_parent_registry() -> None:
     assert Child.__class_objects_map__ is Parent.__class_objects_map__
 
 
-@pytest.mark.xfail(strict=True, reason='__new__ takes no arguments (known issue)')
 def test_subclass_with_init_args_can_be_instantiated() -> None:
-    class A(Identifiable[int]):
-        __enable_auto_id__ = True
-
+    class A(Identifiable[str]):
         def __init__(self, x: int) -> None:
             self.x = x
 
-    assert A(1).x == 1  # pyright: ignore[reportCallIssue]
+        def uid(self) -> str:
+            return 'a'
+
+    assert A(1).x == 1
