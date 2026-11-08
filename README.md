@@ -1,17 +1,76 @@
 # identifiable
 
-A mixin for Python 3.10+ that gives every object a unique ID and keeps a
-class-level registry of instances.
-
-The main goal is one universal interface that makes any family of classes
-identifiable by an ID of some type: an `int`, a `str`, or any other hashable
-type.
+A mixin for Python 3.10+ that gives objects IDs, keeps them in a registry,
+and finds them by ID.
 
 Add `Identifiable` to a class's bases and implement `make_uid()`. Every new
-object gets its ID from `make_uid()` and is registered right away.
+object gets an ID made from its constructor arguments and is registered right
+away. A second object with the same ID is rejected. The ID can be any hashable
+value: a `str`, an `int`, a tuple, even a class.
 
-> **Status:** 0.1.0, early work in progress. Object lookup is not implemented
-> yet: `get_object()` returns `None`. See [Roadmap](#roadmap).
+Because the ID comes from the constructor arguments, you know it before the
+object exists. Other code can hold the ID instead of the object and look the
+object up only when it needs it.
+
+> **Status:** 0.1.0, early work in progress. Lookup by ID is not implemented
+> yet: `get_object()` returns `None`. Lines that use it are marked
+> `# planned`. See [Roadmap](#roadmap).
+
+## Why
+
+Picture a set of rules that describe datasets. Every rule has a unique name,
+rules come in many classes (`SchemaRule`, `FreshnessRule`, ...), and rules
+depend on each other. If each rule holds the rule *objects* it depends on,
+everything gets tangled: each rule's module imports the classes it depends on,
+rules must be built in dependency order, and a rule can't depend on one that
+hasn't been built yet.
+
+With `identifiable`, a rule holds an **ID reference** instead: the other rule's
+ID, as a plain value. The rule behind it is looked up only when it's needed.
+
+```python
+from identifiable import Identifiable
+
+
+class Rule(Identifiable[str]):
+    @classmethod
+    def make_uid(cls, name: str, **settings: object) -> str:
+        return name
+
+    def __init__(self, name: str, **settings: object) -> None:
+        self.name = name
+
+
+# freshness.py: doesn't import SchemaRule
+class FreshnessRule(Rule):
+    def __init__(self, name: str, *, depends_on: str, max_age_hours: int) -> None:
+        super().__init__(name)
+        self.depends_on = depends_on  # an ID reference
+        self.max_age_hours = max_age_hours
+
+    def upstream(self) -> Rule:
+        return Rule.get_object(self.depends_on)  # planned
+
+
+# schema.py: doesn't import FreshnessRule
+class SchemaRule(Rule):
+    def __init__(self, name: str, *, columns: list[str]) -> None:
+        super().__init__(name)
+        self.columns = columns
+
+
+# Build in any order: the reference is only looked up when it's used.
+fresh = FreshnessRule('orders_fresh', depends_on='orders_schema', max_age_hours=24)
+SchemaRule('orders_schema', columns=['id', 'total'])
+
+fresh.upstream()  # planned: the SchemaRule named 'orders_schema'
+SchemaRule('orders_fresh', columns=[])  # raises DuplicateUIDError
+```
+
+The last line fails because names are unique across all rules, whatever
+their class. `identifiable` only finds objects. If an ID reference might point
+to an object that doesn't exist yet, catch the `KeyError` from `get_object()`
+and create the object in your own code.
 
 ## Installation
 
