@@ -115,6 +115,32 @@ def test_get_object_returns_registered_instance() -> None:
     assert A.get_object(a.uid()) is a
 
 
+# --- Duplicate keys ---------------------------------------------------------
+
+
+@pytest.mark.xfail(strict=True, reason=NOT_IMPLEMENTED)
+def test_duplicate_key_in_same_registry_is_rejected() -> None:
+    class Country(Identifiable[str]):
+        def uid(self) -> str:
+            return 'UA'
+
+    Country()
+    with pytest.raises(ValueError, match='duplicate'):
+        Country()
+
+
+def test_same_key_in_separate_registries_is_allowed() -> None:
+    class A(Identifiable[str]):
+        def uid(self) -> str:
+            return 'same'
+
+    class B(Identifiable[str]):
+        def uid(self) -> str:
+            return 'same'
+
+    assert A().uid() == B().uid() == 'same'
+
+
 # --- Inheritance edge cases -------------------------------------------------
 
 
