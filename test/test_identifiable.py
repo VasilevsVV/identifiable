@@ -93,6 +93,28 @@ def test_uid_is_read_only() -> None:
     assert a.uid == 'a'
 
 
+def test_missing_make_uid_raises_on_instantiation() -> None:
+    class A(Identifiable[str]):
+        pass
+
+    with pytest.raises(TypeError, match=r'must implement make_uid\(\)'):
+        A()
+
+
+def test_make_uid_can_come_from_indirect_subclass() -> None:
+    class Base(Identifiable[str]):
+        pass
+
+    class Child(Base):
+        @classmethod
+        def make_uid(cls) -> str:
+            return 'child'
+
+    assert Child().uid == 'child'
+    with pytest.raises(TypeError, match=r'must implement make_uid\(\)'):
+        Base()
+
+
 # --- Lookup -----------------------------------------------------------------
 
 

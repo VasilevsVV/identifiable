@@ -32,7 +32,12 @@ class Identifiable(Generic[_KEY_T]):
 
         Returns:
             The new instance. Its `uid` is the ID from `make_uid()`.
+
+        Raises:
+            TypeError: The class doesn't implement `make_uid()`.
         """
+        if getattr(cls.make_uid, '__isabstractmethod__', False):
+            raise TypeError(f'{cls.__name__} must implement make_uid()')
         uid = cls.make_uid(*args, **kwargs)
         obj = super().__new__(cls)
         obj.__uid = uid
