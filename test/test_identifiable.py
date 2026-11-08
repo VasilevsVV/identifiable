@@ -210,6 +210,37 @@ def test_get_object_on_subclass_only_finds_its_own_objects() -> None:
     assert issubclass(WrongClassUIDError, KeyError)
 
 
+def test_find_object_returns_registered_instance() -> None:
+    class Rule(Identifiable[str]):
+        @classmethod
+        def make_uid(cls, name: str) -> str:
+            return name
+
+    class SchemaRule(Rule):
+        pass
+
+    schema = SchemaRule('orders_schema')
+    assert SchemaRule.find_object('orders_schema') is schema
+    assert_type(SchemaRule.find_object('orders_schema'), SchemaRule | None)
+
+
+def test_find_object_returns_none_when_nothing_matches() -> None:
+    class Rule(Identifiable[str]):
+        @classmethod
+        def make_uid(cls, name: str) -> str:
+            return name
+
+    class SchemaRule(Rule):
+        pass
+
+    class FreshnessRule(Rule):
+        pass
+
+    FreshnessRule('orders_fresh')
+    assert SchemaRule.find_object('missing') is None
+    assert SchemaRule.find_object('orders_fresh') is None
+
+
 # --- Duplicate keys ---------------------------------------------------------
 
 

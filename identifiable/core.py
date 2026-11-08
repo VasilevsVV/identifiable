@@ -139,6 +139,24 @@ class Identifiable(Generic[_KEY_T]):
         return obj
 
     @classmethod
+    def find_object(cls, id: _KEY_T) -> Self | None:
+        """Return the object registered under `id`, or `None` if there is none.
+
+        Same lookup as `get_object`, but returns `None` instead of raising.
+
+        Args:
+            id: The ID of the object.
+
+        Returns:
+            The object registered under `id`, or `None` if no object in the
+            family has the ID or its object isn't an instance of `cls`.
+        """
+        try:
+            return cls.get_object(id)
+        except (UnknownUIDError, WrongClassUIDError):
+            return None
+
+    @classmethod
     @abstractmethod
     def make_uid(cls, *args: Any, **kwargs: Any) -> _KEY_T:
         """Return the ID for a new instance. Subclasses must implement it.
