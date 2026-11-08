@@ -7,29 +7,31 @@ Operational guide for AI agents working on this repository. Read it at the start
 ## Project
 
 - **Name**: `identifiable` (version 0.1.0, early WIP on the `prototype` branch)
-- **What it is**: a mixin for Python 3.10+. Subclasses get unique per-object IDs (optionally auto-generated) and a class-level registry of instances.
+- **What it is**: a mixin for Python 3.10+. Subclasses get unique per-object IDs (made by their own `make_uid()`) and a class-level registry of instances.
 - **Goal**: a reliable, testable mixin that doesn't surprise subclasses or break inheritance chains.
 
 ## How the code works
 
 Everything lives in `identifiable/core.py`.
 
-- `Identifiable(Generic[_KEY_T])` is the mixin. `_KEY_T` is the ID type (must be `Hashable`).
-- Class flags:
-  - `__enable_auto_id__: bool = True`: when True, `__new__` assigns an ID. Adding the mixin needs no settings.
-  - `__id_generation_strategy__: 'increment' | 'uuid' = 'increment'` (`'uuid'` is reserved and not implemented).
-  - `__class_objects_map__: dict` is the registry.
-- `__init_subclass__` only acts on **direct** subclasses (`Identifiable in cls.__bases__`):
-  - It creates a fresh `__class_objects_map__`, or checks that a user-provided one is a `dict`.
-  - If the subclass defines a concrete `uid()`, auto-ID is turned off for it. If auto-ID is set to False without a `uid()`, it raises `TypeError`.
-  - Deeper subclasses skip all of this and **share their parent's registry**.
-- `__new__` runs when auto-ID is on: it calls `__gen_unique_id()` and attaches a `uid` lambda to the instance.
-- `__register_unique_id`, `__gen_unique_id` and `get_object` are **stubs** (`...`).
-- Names that start with two underscores and don't end with two (for example `__gen_unique_id` and `__unique_id`) are name-mangled to `_Identifiable__*`. Subclasses can't override them by their plain names.
+- `Identifiable(Generic[_KEY_T])` is the mixin. `_KEY_T` is the ID type (must be `Hashable`). No metaclass.
+- `make_uid(cls, *args, **kwargs)` is an abstract **classmethod** that subclasses implement. It gets the constructor arguments and returns the new object's ID.
+- `uid` is a read-only property that returns the stored ID (`_Identifiable__uid`).
+- `__class_objects_map__: dict` is the registry, the only class setting.
+- `__new__(cls, *args, **kwargs)`, in order:
+  1. Raises `TypeError` if `make_uid` is still abstract.
+  2. Calls `make_uid(*args, **kwargs)`.
+  3. Raises `DuplicateUIDError` (a `ValueError`) if the ID is already registered. No object is created.
+  4. Creates the object, stores the ID, registers it in `cls.__class_objects_map__`.
+  `__init__` then runs as usual with the same arguments.
+- `__init_subclass__` only acts on **direct** subclasses (`Identifiable in cls.__bases__`): it creates a fresh `__class_objects_map__`, or checks that a user-provided one is a `dict`. Deeper subclasses **share their parent's registry**.
+- `get_object` is a **stub** (`...`).
+- There is no built-in ID generation. It may come back later as a separate class.
+- Names that start with two underscores and don't end with two (for example `__uid`) are name-mangled to `_Identifiable__*`. Subclasses can't override them by their plain names.
 
 ## Danger zone
 
-Changing `__new__`, `__init_subclass__` or the registry affects every subclass: registration, auto-ID and lookups all depend on them.
+Changing `__new__`, `__init_subclass__` or the registry affects every subclass: registration, ID creation, duplicate checks and lookups all depend on them.
 
 - Ask the user before changing their signatures or behaviour, and use plan mode.
 - Always access the registry as `cls.__class_objects_map__`, never through `Identifiable` directly.
@@ -86,8 +88,8 @@ Build and publish with `make build`, `make test-publish` or `make publish`, and 
 
 ```
 identifiable/
-  __init__.py      # public exports: Identifiable
-  core.py          # Identifiable mixin
+  __init__.py      # public exports: Identifiable, DuplicateUIDError
+  core.py          # Identifiable mixin, DuplicateUIDError
 test/              # unit tests: test_*.py or *_test.py
 pyproject.toml  ruff.toml  makefile  .bumpversion.cfg
 ```
@@ -140,9 +142,10 @@ Use these terms in design discussions:
 
 These are documented so they don't get rediscovered. Fix them only when the task calls for it.
 
-- `__new__(cls)` takes no arguments, so a subclass whose `__init__` takes arguments fails to instantiate.
-- `__register_unique_id`, `__gen_unique_id` and `get_object` are unimplemented. With auto-ID on, the generated ID is `None`.
+- `get_object` is unimplemented and returns `None`.
 - Indirect subclasses share their direct parent's registry. It's undecided whether this is intended.
+- An object is registered before `__init__` runs. If `__init__` raises, the registry still holds it.
+- pyright doesn't flag a missing `make_uid()`: it only checks abstract methods under `ABCMeta`, and the mixin is deliberately metaclass-free. A pyright-only `ABCMeta` was considered and rejected, because pyright then reports false metaclass conflicts (e.g. with Django or SQLAlchemy models). A missing `make_uid()` is only a runtime `TypeError`.
 
 ## Session checklist
 

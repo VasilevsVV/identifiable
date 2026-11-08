@@ -7,12 +7,11 @@ The main goal is one universal interface that makes any family of classes
 identifiable by an ID of some type: an `int`, a `str`, or any other hashable
 type.
 
-Add `Identifiable` to a class's bases and it works with no further setup.
-Settings are optional.
+Add `Identifiable` to a class's bases and implement `make_uid()`. Every new
+object gets its ID from `make_uid()` and is registered right away.
 
-> **Status:** 0.1.0, early work in progress. ID generation and object lookup
-> are not implemented yet. Until they are, auto-generated IDs are `None` and
-> `get_object()` returns `None`. See [Roadmap](#roadmap).
+> **Status:** 0.1.0, early work in progress. Object lookup is not implemented
+> yet: `get_object()` returns `None`. See [Roadmap](#roadmap).
 
 ## Installation
 
@@ -24,33 +23,29 @@ The only runtime dependency is `typing_extensions`.
 
 ## Quick start
 
-Auto IDs, no settings needed:
+`make_uid()` is a classmethod. It gets the same arguments as `__init__`:
 
 ```python
-from identifiable import Identifiable
-
-
-class User(Identifiable[int]):
-    pass
-
-
-user = User()
-user.uid()  # the generated ID (None until 'increment' lands)
-```
-
-Your own IDs: define `uid()` and the mixin stops generating IDs for that
-class.
-
-```python
-from identifiable import Identifiable
+from identifiable import DuplicateUIDError, Identifiable
 
 
 class Country(Identifiable[str]):
-    def uid(self) -> str:
-        return 'UA'
+    @classmethod
+    def make_uid(cls, code: str) -> str:
+        return code
+
+    def __init__(self, code: str) -> None:
+        self.code = code
 
 
-Country().uid()  # 'UA'
+ua = Country('UA')
+ua.uid  # 'UA'
+Country.__class_objects_map__  # {'UA': ua}
+
+try:
+    Country('UA')
+except DuplicateUIDError:
+    ...  # 'UA' is already registered
 ```
 
 The type parameter (`Identifiable[int]`, `Identifiable[str]`, ...) is the ID
@@ -62,23 +57,22 @@ What your class defines:
 
 | Method | Required? | Meaning |
 |---|---|---|
-| `uid(self) -> ID` | Only if you own the IDs | Return this object's unique ID. Without it, auto-ID generates one. Defining it turns auto-ID off. |
+| `make_uid(cls, *args, **kwargs) -> ID` | Yes (classmethod) | Return the ID for a new object. It gets the constructor arguments and runs before `__init__`. Creating an object of a class without it raises `TypeError`. |
 
 What the mixin gives you:
 
-| Method | Meaning |
+| Name | Meaning |
 |---|---|
-| `obj.uid()` | The object's ID: yours, or the generated one. |
+| `obj.uid` | The object's ID (read-only property). |
 | `Cls.get_object(id)` | Look up an instance by ID in the class's registry (not implemented yet). |
+| `DuplicateUIDError` | Raised when a new object's ID is already registered. A `ValueError`. No object is created and the registered one is kept. |
 
 ## Optional settings
 
-Set these as class attributes on a direct subclass of `Identifiable`:
+Set this as a class attribute on a direct subclass of `Identifiable`:
 
 | Attribute | Default | Meaning |
 |---|---|---|
-| `__enable_auto_id__` | `True` | Generate an ID for every new instance. It's set to `False` automatically when the class defines `uid()`. Setting it to `False` without a `uid()` raises `TypeError`. |
-| `__id_generation_strategy__` | `'increment'` | How auto IDs are generated. See [Roadmap](#roadmap). |
 | `__class_objects_map__` | a new `dict` | The registry that maps IDs to instances. You can provide your own `dict`; anything else raises `TypeError`. |
 
 Each direct subclass of `Identifiable` gets its own registry. Subclasses of
@@ -86,19 +80,9 @@ that class share it.
 
 ## Roadmap
 
-ID generation strategies:
-
-- **`increment`** (next, and the default): sequential integer IDs, separate
-  for each registry.
-- **`uuid`** (planned): random UUIDs.
-- **`named`** (planned): string IDs that you supply, with uniqueness checked
-  against the registry.
-
-Other planned work:
-
-- Register instances and look them up with `get_object(id)`.
-- Support subclasses whose `__init__` takes arguments. Today, creating an
-  instance of such a class fails.
+- Look up instances with `get_object(id)`.
+- Ready-made ID generation (sequential integers, UUIDs) as a separate class,
+  so a subclass doesn't have to write `make_uid()` itself.
 
 ## Development
 
