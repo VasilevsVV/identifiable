@@ -23,7 +23,10 @@ class Identifiable(Generic[_KEY_T]):
     __uid: _KEY_T
 
     def __new__(cls, *args: Any, **kwargs: Any) -> Self:
-        """Create an instance with the ID returned by `make_uid()`.
+        """Create an instance with the ID from `make_uid()` and register it.
+
+        The instance is added to `__class_objects_map__` under its ID before
+        `__init__` runs.
 
         Args:
             *args: Constructor arguments, passed on to `make_uid()`.
@@ -41,6 +44,7 @@ class Identifiable(Generic[_KEY_T]):
         uid = cls.make_uid(*args, **kwargs)
         obj = super().__new__(cls)
         obj.__uid = uid
+        cls.__class_objects_map__[uid] = obj
         return obj
 
     def __init_subclass__(cls, **kw: Any) -> None:
@@ -68,11 +72,6 @@ class Identifiable(Generic[_KEY_T]):
         else:
             cls.__class_objects_map__ = {}
         super().__init_subclass__(**kw)
-
-    # TODO: not implemented.
-    @classmethod
-    def __register_unique_id(cls, id: _KEY_T) -> None:
-        """Add `id` to the class's registry."""
 
     # TODO: not implemented; returns None.
     @classmethod

@@ -115,6 +115,24 @@ def test_make_uid_can_come_from_indirect_subclass() -> None:
         Base()
 
 
+# --- Registration -----------------------------------------------------------
+
+
+def test_new_objects_are_registered_under_their_uid() -> None:
+    class A(Identifiable[str]):
+        @classmethod
+        def make_uid(cls, code: str) -> str:
+            return code
+
+        def __init__(self, code: str) -> None:
+            self.code = code
+
+    a, b = A('a'), A('b')
+    assert A.__class_objects_map__.keys() == {'a', 'b'}
+    assert A.__class_objects_map__['a'] is a
+    assert A.__class_objects_map__['b'] is b
+
+
 # --- Lookup -----------------------------------------------------------------
 
 
