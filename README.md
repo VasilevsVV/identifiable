@@ -110,6 +110,141 @@ except DuplicateUIDError:
 The type parameter (`Identifiable[int]`, `Identifiable[str]`, ...) is the ID
 type. It must be hashable.
 
+## Use cases
+
+### Named jobs, picked from the command line
+
+Two jobs with the same name fail when the module is imported, not at 2 a.m.
+
+```python
+from identifiable import Identifiable
+
+
+class Job(Identifiable[str]):
+    @classmethod
+    def make_uid(cls, name: str, schedule: str) -> str:
+        return name
+
+    def __init__(self, name: str, schedule: str) -> None:
+        self.name = name
+        self.schedule = schedule
+
+    def run(self) -> None:
+        print(f'running {self.name}')
+
+
+Job('nightly-report', schedule='0 2 * * *')
+Job('cleanup', schedule='0 3 * * *')
+
+
+def main(job_name: str) -> None:  # e.g. `python jobs.py cleanup`
+    Job.get_object(job_name).run()  # planned
+
+
+main('cleanup')
+```
+
+### Reference data from a seed file
+
+Objects that use a currency store its code, an ID reference, and look the
+currency up when they need it. A repeated row in the seed file raises
+`DuplicateUIDError` while loading, instead of quietly replacing the first one.
+
+```python
+from identifiable import Identifiable
+
+
+class Currency(Identifiable[str]):
+    @classmethod
+    def make_uid(cls, code: str, decimals: int) -> str:
+        return code
+
+    def __init__(self, code: str, decimals: int) -> None:
+        self.code = code
+        self.decimals = decimals
+
+
+rows = [{'code': 'EUR', 'decimals': 2}, {'code': 'JPY', 'decimals': 0}]  # from currencies.csv
+for row in rows:
+    Currency(**row)
+
+
+class Price:
+    def __init__(self, minor_units: int, currency: str) -> None:
+        self.minor_units = minor_units
+        self.currency = currency  # an ID reference: 'EUR'
+
+    def __str__(self) -> str:
+        currency = Currency.get_object(self.currency)  # planned
+        return f'{self.minor_units / 10**currency.decimals:.{currency.decimals}f} {currency.code}'
+
+
+print(Price(1999, 'EUR'))  # planned: 19.99 EUR
+```
+
+### ID references in a REST API
+
+A response carries the IDs of related objects instead of embedding them. The
+client requests them only if it needs them.
+
+```python
+from identifiable import Identifiable
+
+
+class Rule(Identifiable[str]):
+    @classmethod
+    def make_uid(cls, name: str, depends_on: tuple[str, ...] = ()) -> str:
+        return name
+
+    def __init__(self, name: str, depends_on: tuple[str, ...] = ()) -> None:
+        self.name = name
+        self.depends_on = depends_on
+
+
+def get_rule(rule_id: str) -> tuple[int, dict]:  # GET /rules/{rule_id}
+    try:
+        rule = Rule.get_object(rule_id)  # planned
+    except KeyError:
+        return 404, {'error': f'no rule {rule_id!r}'}
+    return 200, {'id': rule.uid, 'depends_on': list(rule.depends_on)}
+
+
+Rule('orders_schema')
+Rule('orders_fresh', depends_on=('orders_schema',))
+get_rule('orders_fresh')  # planned: (200, {'id': 'orders_fresh', 'depends_on': ['orders_schema']})
+get_rule('missing')  # planned: (404, {'error': "no rule 'missing'"})
+```
+
+### One object per class
+
+The ID can be the class itself. Then each class in the family can have exactly
+one object, whatever its settings.
+
+```python
+from identifiable import Identifiable
+
+
+class Connector(Identifiable[type]):
+    @classmethod
+    def make_uid(cls, **settings: object) -> type:
+        return cls
+
+    def __init__(self, **settings: object) -> None:
+        self.settings = settings
+
+
+class PostgresConnector(Connector): ...
+
+
+class S3Connector(Connector): ...
+
+
+PostgresConnector(host='db.internal', port=5432)
+S3Connector(bucket='exports')
+Connector.get_object(S3Connector)  # planned: the only S3Connector
+PostgresConnector(host='replica.internal')  # raises DuplicateUIDError
+```
+
 ## Interface
 
 What your class defines:
