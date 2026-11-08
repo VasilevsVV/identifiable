@@ -21,9 +21,10 @@ class Identifiable(Generic[_KEY_T]):
 
     Add it to a class's bases to use it. Optional class-level settings:
 
-    - `__enable_auto_id__`: when True, an ID is generated for every new
-      instance and exposed through `uid()`. When False, the subclass must
-      implement `uid()` itself.
+    - `__enable_auto_id__` (default True): an ID is generated for every new
+      instance and exposed through `uid()`. A direct subclass that defines
+      its own `uid()` gets this turned off automatically. Setting it to False
+      without defining `uid()` is an error.
     - `__id_generation_strategy__`: how auto IDs are generated. Only
       'increment' is planned for now; 'uuid' is reserved.
     - `__class_objects_map__`: the registry mapping IDs to instances. Each
@@ -35,7 +36,7 @@ class Identifiable(Generic[_KEY_T]):
     """
 
     __class_objects_map__: dict
-    __enable_auto_id__: bool = False
+    __enable_auto_id__: bool = True
     __id_generation_strategy__: Literal['increment', 'uuid'] = 'increment'
 
     def __new__(cls) -> Self:
@@ -64,8 +65,11 @@ class Identifiable(Generic[_KEY_T]):
             cls.__class_objects_map__ = {}
 
         # Identifiable has no ABCMeta, so @abstractmethod isn't enforced by
-        # Python. Check by hand that the subclass implements uid().
-        if not cls.__enable_auto_id__ and not _has_concrete_uid(cls):
+        # Python; uid() is checked by hand. A custom uid() means the user owns
+        # IDs, so auto-ID is turned off (otherwise __new__ would hide uid()).
+        if _has_concrete_uid(cls):
+            cls.__enable_auto_id__ = False
+        elif not cls.__enable_auto_id__:
             raise TypeError(
                 f'{cls.__name__} must implement uid() or enable __enable_auto_id__'
             )

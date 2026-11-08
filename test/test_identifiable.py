@@ -69,7 +69,24 @@ def test_concrete_uid_is_used() -> None:
     assert A().uid() == 'fixed'
 
 
+def test_custom_uid_turns_auto_id_off() -> None:
+    class A(Identifiable[str]):
+        def uid(self) -> str:
+            return 'mine'
+
+    assert A.__enable_auto_id__ is False
+    assert A().uid() == 'mine'
+
+
 # --- Auto-ID ----------------------------------------------------------------
+
+
+def test_zero_config_subclass_gets_auto_id() -> None:
+    class A(Identifiable[int]):
+        pass
+
+    assert A.__enable_auto_id__ is True
+    assert callable(A().uid)
 
 
 def test_auto_id_instance_has_callable_uid() -> None:

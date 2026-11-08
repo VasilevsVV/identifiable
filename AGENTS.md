@@ -16,12 +16,12 @@ Everything lives in `identifiable/main.py`.
 
 - `Identifiable(Generic[_KEY_T])` is the mixin. `_KEY_T` is the ID type (must be `Hashable`).
 - Class flags:
-  - `__enable_auto_id__: bool = False`: when True, `__new__` assigns an ID.
+  - `__enable_auto_id__: bool = True`: when True, `__new__` assigns an ID. Adding the mixin needs no settings.
   - `__id_generation_strategy__: 'increment' | 'uuid' = 'increment'` (`'uuid'` is reserved and not implemented).
   - `__class_objects_map__: dict` is the registry.
 - `__init_subclass__` only acts on **direct** subclasses (`Identifiable in cls.__bases__`):
   - It creates a fresh `__class_objects_map__`, or checks that a user-provided one is a `dict`.
-  - If auto-ID is off, the subclass must implement a concrete `uid()`, otherwise it raises.
+  - If the subclass defines a concrete `uid()`, auto-ID is turned off for it. If auto-ID is set to False without a `uid()`, it raises `TypeError`.
   - Deeper subclasses skip all of this and **share their parent's registry**.
 - `__new__` runs when auto-ID is on: it calls `__gen_unique_id()` and attaches a `uid` lambda to the instance.
 - `__register_unique_id`, `__gen_unique_id` and `get_object` are **stubs** (`...`).
