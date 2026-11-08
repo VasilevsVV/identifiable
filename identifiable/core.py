@@ -84,18 +84,17 @@ class Identifiable(Generic[_KEY_T]):
             cls.__class_objects_map__ = {}
         super().__init_subclass__(**kw)
 
-    # TODO: not implemented; returns None.
     @classmethod
     def get_object(cls, id: _KEY_T) -> Self:
-        """Look up an instance in the class's registry.
+        """Return the object registered under `id` in the family's registry.
 
         Args:
-            id: The ID of the instance.
+            id: The ID of the object.
 
         Returns:
-            The instance registered under `id`.
+            The object registered under `id`.
         """
-        ...  # noqa: PIE790 (pyright needs it for a stub)
+        return cls.__class_objects_map__[id]
 
     @classmethod
     @abstractmethod

@@ -9,9 +9,6 @@ import pytest
 
 from identifiable import DuplicateUIDError, Identifiable
 
-NOT_IMPLEMENTED = 'get_object is not implemented yet'
-
-
 # --- Registry setup ---------------------------------------------------------
 
 
@@ -136,7 +133,6 @@ def test_new_objects_are_registered_under_their_uid() -> None:
 # --- Lookup -----------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason=NOT_IMPLEMENTED)
 def test_get_object_returns_registered_instance() -> None:
     class A(Identifiable[str]):
         @classmethod
