@@ -17,11 +17,13 @@ NOT_IMPLEMENTED = 'registry and get_object are not implemented yet'
 
 def test_each_direct_subclass_gets_own_empty_registry() -> None:
     class A(Identifiable[str]):
-        def uid(self) -> str:
+        @classmethod
+        def make_uid(cls) -> str:
             return 'a'
 
     class B(Identifiable[str]):
-        def uid(self) -> str:
+        @classmethod
+        def make_uid(cls) -> str:
             return 'b'
 
     assert A.__class_objects_map__ == {}
@@ -35,7 +37,8 @@ def test_user_provided_dict_registry_is_kept() -> None:
     class A(Identifiable[str]):
         __class_objects_map__ = registry
 
-        def uid(self) -> str:
+        @classmethod
+        def make_uid(cls) -> str:
             return 'a'
 
     assert A.__class_objects_map__ is registry
@@ -47,8 +50,47 @@ def test_non_dict_registry_is_rejected() -> None:
         class A(Identifiable[str]):
             __class_objects_map__ = 'not a dict'  # pyright: ignore[reportAssignmentType]
 
-            def uid(self) -> str:
+            @classmethod
+            def make_uid(cls) -> str:
                 return 'a'
+
+
+# --- make_uid() and uid -----------------------------------------------------
+
+
+def test_uid_returns_id_made_by_make_uid() -> None:
+    class A(Identifiable[str]):
+        @classmethod
+        def make_uid(cls) -> str:
+            return 'fixed'
+
+    assert A().uid == 'fixed'
+
+
+def test_make_uid_gets_constructor_args() -> None:
+    class Country(Identifiable[str]):
+        @classmethod
+        def make_uid(cls, code: str, *, suffix: str = '') -> str:
+            return code + suffix
+
+        def __init__(self, code: str, *, suffix: str = '') -> None:
+            self.code = code
+
+    country = Country('UA', suffix='-1')
+    assert country.uid == 'UA-1'
+    assert country.code == 'UA'
+
+
+def test_uid_is_read_only() -> None:
+    class A(Identifiable[str]):
+        @classmethod
+        def make_uid(cls) -> str:
+            return 'a'
+
+    a = A()
+    with pytest.raises(AttributeError):
+        a.uid = 'b'  # pyright: ignore[reportAttributeAccessIssue]
+    assert a.uid == 'a'
 
 
 # --- Lookup -----------------------------------------------------------------
@@ -57,11 +99,12 @@ def test_non_dict_registry_is_rejected() -> None:
 @pytest.mark.xfail(strict=True, reason=NOT_IMPLEMENTED)
 def test_get_object_returns_registered_instance() -> None:
     class A(Identifiable[str]):
-        def uid(self) -> str:
+        @classmethod
+        def make_uid(cls) -> str:
             return 'a'
 
     a = A()
-    assert A.get_object(a.uid()) is a
+    assert A.get_object(a.uid) is a
 
 
 # --- Duplicate keys ---------------------------------------------------------
@@ -70,7 +113,8 @@ def test_get_object_returns_registered_instance() -> None:
 @pytest.mark.xfail(strict=True, reason=NOT_IMPLEMENTED)
 def test_duplicate_key_in_same_registry_is_rejected() -> None:
     class Country(Identifiable[str]):
-        def uid(self) -> str:
+        @classmethod
+        def make_uid(cls) -> str:
             return 'UA'
 
     Country()
@@ -80,14 +124,16 @@ def test_duplicate_key_in_same_registry_is_rejected() -> None:
 
 def test_same_key_in_separate_registries_is_allowed() -> None:
     class A(Identifiable[str]):
-        def uid(self) -> str:
+        @classmethod
+        def make_uid(cls) -> str:
             return 'same'
 
     class B(Identifiable[str]):
-        def uid(self) -> str:
+        @classmethod
+        def make_uid(cls) -> str:
             return 'same'
 
-    assert A().uid() == B().uid() == 'same'
+    assert A().uid == B().uid == 'same'
 
 
 # --- Inheritance edge cases -------------------------------------------------
@@ -96,7 +142,8 @@ def test_same_key_in_separate_registries_is_allowed() -> None:
 def test_indirect_subclass_shares_parent_registry() -> None:
     # Current behaviour; whether it's intended is still undecided.
     class Parent(Identifiable[str]):
-        def uid(self) -> str:
+        @classmethod
+        def make_uid(cls) -> str:
             return 'p'
 
     class Child(Parent):
@@ -106,11 +153,14 @@ def test_indirect_subclass_shares_parent_registry() -> None:
 
 
 def test_subclass_with_init_args_can_be_instantiated() -> None:
-    class A(Identifiable[str]):
+    class A(Identifiable[int]):
+        @classmethod
+        def make_uid(cls, x: int) -> int:
+            return x
+
         def __init__(self, x: int) -> None:
             self.x = x
 
-        def uid(self) -> str:
-            return 'a'
-
-    assert A(1).x == 1
+    a = A(1)
+    assert a.x == 1
+    assert a.uid == 1

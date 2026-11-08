@@ -20,6 +20,23 @@ class Identifiable(Generic[_KEY_T]):
     """
 
     __class_objects_map__: dict
+    __uid: _KEY_T
+
+    def __new__(cls, *args: Any, **kwargs: Any) -> Self:
+        """Create an instance with the ID returned by `make_uid()`.
+
+        Args:
+            *args: Constructor arguments, passed on to `make_uid()`.
+            **kwargs: Constructor keyword arguments, passed on to
+                `make_uid()`.
+
+        Returns:
+            The new instance. Its `uid` is the ID from `make_uid()`.
+        """
+        uid = cls.make_uid(*args, **kwargs)
+        obj = super().__new__(cls)
+        obj.__uid = uid
+        return obj
 
     def __init_subclass__(cls, **kw: Any) -> None:
         """Set up a direct subclass's registry.
@@ -65,11 +82,23 @@ class Identifiable(Generic[_KEY_T]):
         """
         ...  # noqa: PIE790 (pyright needs it for a stub)
 
+    @classmethod
     @abstractmethod
-    def uid(self) -> _KEY_T:
-        """Return this object's unique ID.
+    def make_uid(cls, *args: Any, **kwargs: Any) -> _KEY_T:
+        """Return the ID for a new instance. Subclasses must implement it.
+
+        Called by `__new__` before `__init__` runs.
+
+        Args:
+            *args: The constructor arguments.
+            **kwargs: The constructor keyword arguments.
 
         Returns:
-            The ID, of the class's ID type.
+            The new instance's ID, of the class's ID type.
         """
         ...
+
+    @property
+    def uid(self) -> _KEY_T:
+        """This object's unique ID, as returned by `make_uid()`. Read-only."""
+        return self.__uid
