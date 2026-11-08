@@ -15,11 +15,8 @@ class DuplicateUIDError(ValueError):
     """
 
 
-class UnknownUIDError(KeyError):
-    """Raised when no object in the family's registry has the looked-up ID.
-
-    Raised by `Identifiable.get_object`.
-    """
+class _MessageKeyError(KeyError):
+    """`KeyError` whose message prints without quotes."""
 
     def __str__(self) -> str:
         """Return the message as given, without `KeyError`'s quotes.
@@ -28,6 +25,21 @@ class UnknownUIDError(KeyError):
             The error message.
         """
         return str(self.args[0]) if self.args else ''
+
+
+class UnknownUIDError(_MessageKeyError):
+    """Raised when no object in the family's registry has the looked-up ID.
+
+    Raised by `Identifiable.get_object`. A `KeyError`.
+    """
+
+
+class WrongClassUIDError(_MessageKeyError):
+    """Raised when the looked-up ID's object isn't of the class looked up on.
+
+    The ID is held by another class in the same family. Raised by
+    `Identifiable.get_object`. A `KeyError`.
+    """
 
 
 class Identifiable(Generic[_KEY_T]):
@@ -101,7 +113,10 @@ class Identifiable(Generic[_KEY_T]):
 
     @classmethod
     def get_object(cls, id: _KEY_T) -> Self:
-        """Return the object registered under `id` in the family's registry.
+        """Return the object registered under `id`, if it's an instance of `cls`.
+
+        Called on the family base, it finds any object in the family. Called
+        on a subclass, it finds only objects of that subclass.
 
         Args:
             id: The ID of the object.
@@ -111,10 +126,17 @@ class Identifiable(Generic[_KEY_T]):
 
         Raises:
             UnknownUIDError: No object in the family has the ID.
+            WrongClassUIDError: The object with the ID isn't an instance of
+                `cls`.
         """
         if id not in cls.__class_objects_map__:
             raise UnknownUIDError(f'{cls.__name__}: unknown uid {id!r}')
-        return cls.__class_objects_map__[id]
+        obj = cls.__class_objects_map__[id]
+        if not isinstance(obj, cls):
+            raise WrongClassUIDError(
+                f'{cls.__name__}: uid {id!r} belongs to a {type(obj).__name__}'
+            )
+        return obj
 
     @classmethod
     @abstractmethod

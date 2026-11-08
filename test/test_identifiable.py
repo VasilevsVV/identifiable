@@ -8,7 +8,12 @@ yet. They fail loudly once the behaviour lands, so remove the marker then.
 import pytest
 from typing_extensions import assert_type
 
-from identifiable import DuplicateUIDError, Identifiable, UnknownUIDError
+from identifiable import (
+    DuplicateUIDError,
+    Identifiable,
+    UnknownUIDError,
+    WrongClassUIDError,
+)
 
 # --- Registry setup ---------------------------------------------------------
 
@@ -176,6 +181,33 @@ def test_get_object_on_family_base_finds_any_family_member() -> None:
     assert Rule.get_object('orders_schema') is schema
     assert Rule.get_object('orders_fresh') is fresh
     assert_type(Rule.get_object('orders_fresh'), Rule)
+
+
+def test_get_object_on_subclass_only_finds_its_own_objects() -> None:
+    class Rule(Identifiable[str]):
+        @classmethod
+        def make_uid(cls, name: str) -> str:
+            return name
+
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+    class SchemaRule(Rule):
+        pass
+
+    class FreshnessRule(Rule):
+        pass
+
+    schema = SchemaRule('orders_schema')
+    FreshnessRule('orders_fresh')
+    assert SchemaRule.get_object('orders_schema') is schema
+    assert_type(SchemaRule.get_object('orders_schema'), SchemaRule)
+    with pytest.raises(
+        WrongClassUIDError,
+        match="^SchemaRule: uid 'orders_fresh' belongs to a FreshnessRule$",
+    ):
+        SchemaRule.get_object('orders_fresh')
+    assert issubclass(WrongClassUIDError, KeyError)
 
 
 # --- Duplicate keys ---------------------------------------------------------
