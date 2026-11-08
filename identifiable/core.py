@@ -15,6 +15,21 @@ class DuplicateUIDError(ValueError):
     """
 
 
+class UnknownUIDError(KeyError):
+    """Raised when no object in the family's registry has the looked-up ID.
+
+    Raised by `Identifiable.get_object`.
+    """
+
+    def __str__(self) -> str:
+        """Return the message as given, without `KeyError`'s quotes.
+
+        Returns:
+            The error message.
+        """
+        return str(self.args[0]) if self.args else ''
+
+
 class Identifiable(Generic[_KEY_T]):
     """Mixin that gives every instance a unique ID and a class-level registry.
 
@@ -93,7 +108,12 @@ class Identifiable(Generic[_KEY_T]):
 
         Returns:
             The object registered under `id`.
+
+        Raises:
+            UnknownUIDError: No object in the family has the ID.
         """
+        if id not in cls.__class_objects_map__:
+            raise UnknownUIDError(f'{cls.__name__}: unknown uid {id!r}')
         return cls.__class_objects_map__[id]
 
     @classmethod

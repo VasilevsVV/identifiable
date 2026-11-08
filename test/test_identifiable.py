@@ -7,7 +7,7 @@ yet. They fail loudly once the behaviour lands, so remove the marker then.
 
 import pytest
 
-from identifiable import DuplicateUIDError, Identifiable
+from identifiable import DuplicateUIDError, Identifiable, UnknownUIDError
 
 # --- Registry setup ---------------------------------------------------------
 
@@ -141,6 +141,18 @@ def test_get_object_returns_registered_instance() -> None:
 
     a = A()
     assert A.get_object(a.uid) is a
+
+
+def test_get_object_raises_unknown_uid_error_for_unknown_id() -> None:
+    class Country(Identifiable[str]):
+        @classmethod
+        def make_uid(cls, code: str) -> str:
+            return code
+
+    Country('UA')
+    with pytest.raises(UnknownUIDError, match="^Country: unknown uid 'PL'$"):
+        Country.get_object('PL')
+    assert issubclass(UnknownUIDError, KeyError)
 
 
 # --- Duplicate keys ---------------------------------------------------------
