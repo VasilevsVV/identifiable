@@ -164,7 +164,8 @@ class Currency(Identifiable[str]):
         self.decimals = decimals
 
 
-rows = [{'code': 'EUR', 'decimals': 2}, {'code': 'JPY', 'decimals': 0}]  # from currencies.csv
+# Rows read from currencies.csv
+rows = [{'code': 'EUR', 'decimals': 2}, {'code': 'JPY', 'decimals': 0}]
 for row in rows:
     Currency(**row)
 
@@ -211,7 +212,8 @@ def get_rule(rule_id: str) -> tuple[int, dict]:  # GET /rules/{rule_id}
 
 Rule('orders_schema')
 Rule('orders_fresh', depends_on=('orders_schema',))
-get_rule('orders_fresh')  # planned: (200, {'id': 'orders_fresh', 'depends_on': ['orders_schema']})
+get_rule('orders_fresh')  # planned
+# (200, {'id': 'orders_fresh', 'depends_on': ['orders_schema']})
 get_rule('missing')  # planned: (404, {'error': "no rule 'missing'"})
 ```
 
@@ -309,25 +311,49 @@ What the mixin gives you:
 | Name | Meaning |
 |---|---|
 | `obj.uid` | The object's ID (read-only property). |
-| `Cls.get_object(id)` | Look up an instance by ID in the class's registry (not implemented yet). |
-| `DuplicateUIDError` | Raised when a new object's ID is already registered. A `ValueError`. No object is created and the registered one is kept. |
+| `Cls.get_object(id)` | **Planned.** Return the object registered under `id` in the family's registry, whichever class in the family it belongs to. Typed to return the family base. Raises `KeyError` if no object has that ID. |
+| `DuplicateUIDError` | Raised when a new object's ID is already in its family's registry. A `ValueError`. No object is created and the registered one is kept. |
 
-## Optional settings
+## Families and the registry
 
-Set this as a class attribute on a direct subclass of `Identifiable`:
+The class that lists `Identifiable` in its bases is the **family base**. It
+and all of its subclasses form one **family** that shares one registry. As a
+result:
+
+- An ID is unique across the whole family. `SchemaRule('orders')` and
+  `FreshnessRule('orders')` can't both exist.
+- Any member of the family can refer to any other by ID, without importing its
+  class.
+- Separate families have separate registries, so they can reuse IDs.
+
+For the reasoning, see
+[ADR 0001](docs/adr/0001-one-registry-per-family.md).
+
+You can set the registry yourself as a class attribute on the family base:
 
 | Attribute | Default | Meaning |
 |---|---|---|
-| `__class_objects_map__` | a new `dict` | The registry that maps IDs to instances. You can provide your own `dict`; anything else raises `TypeError`. |
+| `__class_objects_map__` | a new `dict` | The registry that maps IDs to objects. You can provide your own `dict`; anything else raises `TypeError`. |
 
-Each direct subclass of `Identifiable` gets its own registry. Subclasses of
-that class share it.
+## Scope
+
+`identifiable` makes IDs, registers objects under them and finds them by ID.
+Your own code stays in charge of:
+
+- creating objects, including creating them lazily on first access;
+- resolving ID references: an ID reference is a plain value until you look it
+  up.
+
+The terms used here are defined in [GLOSSARY.md](GLOSSARY.md).
 
 ## Roadmap
 
-- Look up instances with `get_object(id)`.
+- Look up objects with `get_object(id)`.
+- Support `copy` and `pickle`. The behaviour still needs a design, since a copy
+  would be a duplicate.
 - Ready-made ID generation (sequential integers, UUIDs) as a separate class,
-  so a subclass doesn't have to write `make_uid()` itself.
+  for objects without a natural name. A generated ID isn't known before the
+  object exists, so it can't be referenced in advance.
 
 ## Development
 
