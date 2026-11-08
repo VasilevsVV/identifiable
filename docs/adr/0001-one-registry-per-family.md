@@ -2,9 +2,9 @@
 
 A family base (the class that mixes in `Identifiable` directly) and all of its subclasses share
 one registry, so they share one ID namespace. Family members can then refer to each other by ID
-without importing each other's classes, and a lookup searches the whole family. This came from a
-system of rules describing datasets: rules of many classes referenced each other by name, often
-before the referenced rule existed.
+without importing each other's classes, and a lookup through the family base searches the whole
+family. This came from a system of rules describing datasets: rules of many classes referenced
+each other by name, often before the referenced rule existed.
 
 ## Considered options
 
@@ -15,5 +15,5 @@ before the referenced rule existed.
 
 - Sibling classes can't reuse an ID: `SchemaRule('orders')` followed by `FreshnessRule('orders')`
   raises `DuplicateUIDError`.
-- `get_object()` is typed to return the family base, not the class it's called on, because a
-  lookup through any class in the family can return any family member.
+- A lookup narrows to the class it's called on, so a lookup across the family goes through the
+  family base. See [ADR 0003](0003-lookup-narrows-to-the-called-class.md).

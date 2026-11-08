@@ -10,7 +10,7 @@ Operational guide for AI agents working on this repository. Read it at the start
 - **What it is**: a mixin for Python 3.10+. It gives a family of classes one interface to make an ID for each object (`make_uid()`), register the object under it, reject duplicates and look objects up by ID.
 - **Goal**: easy to add to existing classes: add `Identifiable` to the bases and implement `make_uid()`. It must stay reliable and testable, and must not surprise subclasses or break inheritance chains.
 - **Scope**: user code owns creating objects, lazy creation and resolving ID references. The mixin only makes, registers and looks up IDs.
-- **Docs**: `README.md` holds the purpose, use cases and public interface (including planned features). `GLOSSARY.md` holds the domain terms; use them when naming things in code, docs and commits. `docs/adr/` records design decisions; read it before changing registry sharing or adding a metaclass.
+- **Docs**: `README.md` holds the purpose, use cases and public interface (including planned features). `GLOSSARY.md` holds the domain terms; use them when naming things in code, docs and commits. `docs/adr/` records design decisions; read it before changing registry sharing or lookup, or adding a metaclass.
 
 ## How the code works
 
@@ -27,7 +27,8 @@ Everything lives in `identifiable/core.py`.
   4. Creates the object, stores the ID, registers it in `cls.__class_objects_map__`.
   `__init__` then runs as usual with the same arguments.
 - `__init_subclass__` only acts on **direct** subclasses (`Identifiable in cls.__bases__`): it creates a fresh `__class_objects_map__`, or checks that a user-provided one is a `dict`. Deeper subclasses **share their parent's registry** on purpose: the direct subclass is the family base, and the whole family has one ID namespace (ADR 0001).
-- `get_object` is a **stub** (`...`). Its planned contract is in README.md's Interface section. The stub's `-> Self` return type doesn't match that contract yet (it should be the family base).
+- `get_object(id) -> Self` looks `id` up in `cls.__class_objects_map__` and narrows to `cls` (ADR 0003). It raises `UnknownUIDError` if the ID isn't registered and `WrongClassUIDError` if its object isn't an instance of `cls`; both are `KeyError` subclasses whose message prints unquoted. On the family base it finds any family member.
+- `find_object(id) -> Self | None` calls `get_object` and returns `None` in place of either error.
 - There is no built-in ID generation. It may come back later as a separate class.
 - Names that start with two underscores and don't end with two (for example `__uid`) are name-mangled to `_Identifiable__*`. Subclasses can't override them by their plain names.
 
@@ -90,8 +91,8 @@ Build and publish with `make build`, `make test-publish` or `make publish`, and 
 
 ```
 identifiable/
-  __init__.py      # public exports: Identifiable, DuplicateUIDError
-  core.py          # Identifiable mixin, DuplicateUIDError
+  __init__.py      # public exports: Identifiable and the three errors
+  core.py          # Identifiable mixin, DuplicateUIDError, UnknownUIDError, WrongClassUIDError
 test/              # unit tests: test_*.py or *_test.py
 docs/adr/          # design decisions
 GLOSSARY.md        # domain terms
@@ -146,8 +147,7 @@ Domain terms (ID, family, registry, ID reference, ...) live in `GLOSSARY.md`. Us
 
 These are documented so they don't get rediscovered. Fix them only when the task calls for it.
 
-- `get_object` is unimplemented and returns `None`.
-- An object is registered before `__init__` runs. If `__init__` raises, the registry still holds it.
+- An object is registered before `__init__` runs. If `__init__` raises, the registry still holds it and the lookups return the half-built object. `__new__` alone can't fix this (it returns before `__init__` runs); the planned fix wraps `__init__` in `__init_subclass__`.
 - `copy.copy`, `copy.deepcopy` and `pickle` fail with `TypeError`: they call `cls.__new__(cls)` without arguments, so `make_uid()` gets none. A fix still needs a design (a copy would also be a duplicate).
 - pyright doesn't flag a missing `make_uid()`; it's only a runtime `TypeError`. This follows from staying metaclass-free (ADR 0002).
 

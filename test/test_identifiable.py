@@ -6,11 +6,14 @@ yet. They fail loudly once the behaviour lands, so remove the marker then.
 """
 
 import pytest
+from typing_extensions import assert_type
 
-from identifiable import DuplicateUIDError, Identifiable
-
-NOT_IMPLEMENTED = 'get_object is not implemented yet'
-
+from identifiable import (
+    DuplicateUIDError,
+    Identifiable,
+    UnknownUIDError,
+    WrongClassUIDError,
+)
 
 # --- Registry setup ---------------------------------------------------------
 
@@ -136,7 +139,6 @@ def test_new_objects_are_registered_under_their_uid() -> None:
 # --- Lookup -----------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason=NOT_IMPLEMENTED)
 def test_get_object_returns_registered_instance() -> None:
     class A(Identifiable[str]):
         @classmethod
@@ -145,6 +147,98 @@ def test_get_object_returns_registered_instance() -> None:
 
     a = A()
     assert A.get_object(a.uid) is a
+
+
+def test_get_object_raises_unknown_uid_error_for_unknown_id() -> None:
+    class Country(Identifiable[str]):
+        @classmethod
+        def make_uid(cls, code: str) -> str:
+            return code
+
+    Country('UA')
+    with pytest.raises(UnknownUIDError, match="^Country: unknown uid 'PL'$"):
+        Country.get_object('PL')
+    assert issubclass(UnknownUIDError, KeyError)
+
+
+def test_get_object_on_family_base_finds_any_family_member() -> None:
+    class Rule(Identifiable[str]):
+        @classmethod
+        def make_uid(cls, name: str) -> str:
+            return name
+
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+    class SchemaRule(Rule):
+        pass
+
+    class FreshnessRule(Rule):
+        pass
+
+    schema = SchemaRule('orders_schema')
+    fresh = FreshnessRule('orders_fresh')
+    assert Rule.get_object('orders_schema') is schema
+    assert Rule.get_object('orders_fresh') is fresh
+    assert_type(Rule.get_object('orders_fresh'), Rule)
+
+
+def test_get_object_on_subclass_only_finds_its_own_objects() -> None:
+    class Rule(Identifiable[str]):
+        @classmethod
+        def make_uid(cls, name: str) -> str:
+            return name
+
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+    class SchemaRule(Rule):
+        pass
+
+    class FreshnessRule(Rule):
+        pass
+
+    schema = SchemaRule('orders_schema')
+    FreshnessRule('orders_fresh')
+    assert SchemaRule.get_object('orders_schema') is schema
+    assert_type(SchemaRule.get_object('orders_schema'), SchemaRule)
+    with pytest.raises(
+        WrongClassUIDError,
+        match="^SchemaRule: uid 'orders_fresh' belongs to a FreshnessRule$",
+    ):
+        SchemaRule.get_object('orders_fresh')
+    assert issubclass(WrongClassUIDError, KeyError)
+
+
+def test_find_object_returns_registered_instance() -> None:
+    class Rule(Identifiable[str]):
+        @classmethod
+        def make_uid(cls, name: str) -> str:
+            return name
+
+    class SchemaRule(Rule):
+        pass
+
+    schema = SchemaRule('orders_schema')
+    assert SchemaRule.find_object('orders_schema') is schema
+    assert_type(SchemaRule.find_object('orders_schema'), SchemaRule | None)
+
+
+def test_find_object_returns_none_when_nothing_matches() -> None:
+    class Rule(Identifiable[str]):
+        @classmethod
+        def make_uid(cls, name: str) -> str:
+            return name
+
+    class SchemaRule(Rule):
+        pass
+
+    class FreshnessRule(Rule):
+        pass
+
+    FreshnessRule('orders_fresh')
+    assert SchemaRule.find_object('missing') is None
+    assert SchemaRule.find_object('orders_fresh') is None
 
 
 # --- Duplicate keys ---------------------------------------------------------

@@ -15,6 +15,33 @@ class DuplicateUIDError(ValueError):
     """
 
 
+class _MessageKeyError(KeyError):
+    """`KeyError` whose message prints without quotes."""
+
+    def __str__(self) -> str:
+        """Return the message as given, without `KeyError`'s quotes.
+
+        Returns:
+            The error message.
+        """
+        return str(self.args[0]) if self.args else ''
+
+
+class UnknownUIDError(_MessageKeyError):
+    """Raised when no object in the family's registry has the looked-up ID.
+
+    Raised by `Identifiable.get_object`. A `KeyError`.
+    """
+
+
+class WrongClassUIDError(_MessageKeyError):
+    """Raised when the looked-up ID's object isn't of the class looked up on.
+
+    The ID is held by another class in the same family. Raised by
+    `Identifiable.get_object`. A `KeyError`.
+    """
+
+
 class Identifiable(Generic[_KEY_T]):
     """Mixin that gives every instance a unique ID and a class-level registry.
 
@@ -84,18 +111,50 @@ class Identifiable(Generic[_KEY_T]):
             cls.__class_objects_map__ = {}
         super().__init_subclass__(**kw)
 
-    # TODO: not implemented; returns None.
     @classmethod
     def get_object(cls, id: _KEY_T) -> Self:
-        """Look up an instance in the class's registry.
+        """Return the object registered under `id`, if it's an instance of `cls`.
+
+        Called on the family base, it finds any object in the family. Called
+        on a subclass, it finds only objects of that subclass.
 
         Args:
-            id: The ID of the instance.
+            id: The ID of the object.
 
         Returns:
-            The instance registered under `id`.
+            The object registered under `id`.
+
+        Raises:
+            UnknownUIDError: No object in the family has the ID.
+            WrongClassUIDError: The object with the ID isn't an instance of
+                `cls`.
         """
-        ...  # noqa: PIE790 (pyright needs it for a stub)
+        if id not in cls.__class_objects_map__:
+            raise UnknownUIDError(f'{cls.__name__}: unknown uid {id!r}')
+        obj = cls.__class_objects_map__[id]
+        if not isinstance(obj, cls):
+            raise WrongClassUIDError(
+                f'{cls.__name__}: uid {id!r} belongs to a {type(obj).__name__}'
+            )
+        return obj
+
+    @classmethod
+    def find_object(cls, id: _KEY_T) -> Self | None:
+        """Return the object registered under `id`, or `None` if there is none.
+
+        Same lookup as `get_object`, but returns `None` instead of raising.
+
+        Args:
+            id: The ID of the object.
+
+        Returns:
+            The object registered under `id`, or `None` if no object in the
+            family has the ID or its object isn't an instance of `cls`.
+        """
+        try:
+            return cls.get_object(id)
+        except (UnknownUIDError, WrongClassUIDError):
+            return None
 
     @classmethod
     @abstractmethod

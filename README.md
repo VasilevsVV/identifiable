@@ -12,9 +12,7 @@ Because the ID comes from the constructor arguments, you know it before the
 object exists. Other code can hold the ID instead of the object and look the
 object up only when it needs it.
 
-> **Status:** 0.1.0, early work in progress. Lookup by ID is not implemented
-> yet: `get_object()` returns `None`. Lines that use it are marked
-> `# planned`. See [Roadmap](#roadmap).
+> **Status:** 0.1.0, early work in progress. See [Roadmap](#roadmap).
 
 ## Why
 
@@ -49,7 +47,7 @@ class FreshnessRule(Rule):
         self.max_age_hours = max_age_hours
 
     def upstream(self) -> Rule:
-        return Rule.get_object(self.depends_on)  # planned
+        return Rule.get_object(self.depends_on)
 
 
 # schema.py: doesn't import FreshnessRule
@@ -63,14 +61,14 @@ class SchemaRule(Rule):
 fresh = FreshnessRule('orders_fresh', depends_on='orders_schema', max_age_hours=24)
 SchemaRule('orders_schema', columns=['id', 'total'])
 
-fresh.upstream()  # planned: the SchemaRule named 'orders_schema'
+fresh.upstream()  # the SchemaRule named 'orders_schema'
 SchemaRule('orders_fresh', columns=[])  # raises DuplicateUIDError
 ```
 
 The last line fails because names are unique across all rules, whatever
 their class. `identifiable` only finds objects. If an ID reference might point
-to an object that doesn't exist yet, catch the `KeyError` from `get_object()`
-and create the object in your own code.
+to an object that doesn't exist yet, use `Rule.find_object()`, which returns
+`None` instead of raising, and create the object in your own code.
 
 ## Installation
 
@@ -138,7 +136,7 @@ Job('cleanup', schedule='0 3 * * *')
 
 
 def main(job_name: str) -> None:  # e.g. `python jobs.py cleanup`
-    Job.get_object(job_name).run()  # planned
+    Job.get_object(job_name).run()
 
 
 main('cleanup')
@@ -176,11 +174,11 @@ class Price:
         self.currency = currency  # an ID reference: 'EUR'
 
     def __str__(self) -> str:
-        currency = Currency.get_object(self.currency)  # planned
+        currency = Currency.get_object(self.currency)
         return f'{self.minor_units / 10**currency.decimals:.{currency.decimals}f} {currency.code}'
 
 
-print(Price(1999, 'EUR'))  # planned: 19.99 EUR
+print(Price(1999, 'EUR'))  # 19.99 EUR
 ```
 
 ### ID references in a REST API
@@ -203,18 +201,17 @@ class Rule(Identifiable[str]):
 
 
 def get_rule(rule_id: str) -> tuple[int, dict]:  # GET /rules/{rule_id}
-    try:
-        rule = Rule.get_object(rule_id)  # planned
-    except KeyError:
+    rule = Rule.find_object(rule_id)
+    if rule is None:
         return 404, {'error': f'no rule {rule_id!r}'}
     return 200, {'id': rule.uid, 'depends_on': list(rule.depends_on)}
 
 
 Rule('orders_schema')
 Rule('orders_fresh', depends_on=('orders_schema',))
-get_rule('orders_fresh')  # planned
+get_rule('orders_fresh')
 # (200, {'id': 'orders_fresh', 'depends_on': ['orders_schema']})
-get_rule('missing')  # planned: (404, {'error': "no rule 'missing'"})
+get_rule('missing')  # (404, {'error': "no rule 'missing'"})
 ```
 
 ### One object per class
@@ -243,7 +240,7 @@ class S3Connector(Connector): ...
 
 PostgresConnector(host='db.internal', port=5432)
 S3Connector(bucket='exports')
-Connector.get_object(S3Connector)  # planned: the only S3Connector
+Connector.get_object(S3Connector)  # the only S3Connector
 PostgresConnector(host='replica.internal')  # raises DuplicateUIDError
 ```
 
@@ -283,6 +280,10 @@ sensor.uid  # 'SN-0042'
 no arguments and raises `TypeError`. The same goes for anything that pickles
 objects, such as `multiprocessing` queues and pools. See [Roadmap](#roadmap).
 
+**An object whose `__init__` raises stays registered.** The object is
+registered before `__init__` runs, so the lookups return it half-built, and
+its ID can't be used again.
+
 ## When not to use it
 
 - **Short-lived objects.** The registry keeps every object for as long as the
@@ -311,8 +312,11 @@ What the mixin gives you:
 | Name | Meaning |
 |---|---|
 | `obj.uid` | The object's ID (read-only property). |
-| `Cls.get_object(id)` | **Planned.** Return the object registered under `id` in the family's registry, whichever class in the family it belongs to. Typed to return the family base. Raises `KeyError` if no object has that ID. |
+| `Cls.get_object(id)` | Return the object registered under `id`. On the family base, it finds any object in the family; on a subclass, only objects of that subclass. Typed as the class it's called on. Raises `UnknownUIDError` or `WrongClassUIDError` if there's no such object. |
+| `Cls.find_object(id)` | The same lookup, but returns `None` instead of raising. |
 | `DuplicateUIDError` | Raised when a new object's ID is already in its family's registry. A `ValueError`. No object is created and the registered one is kept. |
+| `UnknownUIDError` | Raised by `get_object()` when no object in the family has the ID. A `KeyError`. |
+| `WrongClassUIDError` | Raised by `get_object()` when the ID belongs to an object of another class in the family. A `KeyError`. |
 
 ## Families and the registry
 
@@ -322,12 +326,17 @@ result:
 
 - An ID is unique across the whole family. `SchemaRule('orders')` and
   `FreshnessRule('orders')` can't both exist.
-- Any member of the family can refer to any other by ID, without importing its
-  class.
+- Any member of the family can refer to any other by ID and look it up
+  through the family base, without importing its class.
+- A lookup on a subclass only finds that subclass's objects. So
+  `SchemaRule.find_object(id) or SchemaRule(id, ...)` can still raise
+  `DuplicateUIDError` when a `FreshnessRule` holds the ID. On the family base,
+  `None` means the ID is free.
 - Separate families have separate registries, so they can reuse IDs.
 
 For the reasoning, see
-[ADR 0001](docs/adr/0001-one-registry-per-family.md).
+[ADR 0001](docs/adr/0001-one-registry-per-family.md) and
+[ADR 0003](docs/adr/0003-lookup-narrows-to-the-called-class.md).
 
 You can set the registry yourself as a class attribute on the family base:
 
@@ -348,7 +357,7 @@ The terms used here are defined in [GLOSSARY.md](GLOSSARY.md).
 
 ## Roadmap
 
-- Look up objects with `get_object(id)`.
+- Remove an object from the registry when its `__init__` raises.
 - Support `copy` and `pickle`. The behaviour still needs a design, since a copy
   would be a duplicate.
 - Ready-made ID generation (sequential integers, UUIDs) as a separate class,
