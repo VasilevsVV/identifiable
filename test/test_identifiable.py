@@ -184,7 +184,6 @@ def test_same_key_in_separate_registries_is_allowed() -> None:
 
 
 def test_indirect_subclass_shares_parent_registry() -> None:
-    # Current behaviour; whether it's intended is still undecided.
     class Parent(Identifiable[str]):
         @classmethod
         def make_uid(cls) -> str:
@@ -194,6 +193,27 @@ def test_indirect_subclass_shares_parent_registry() -> None:
         pass
 
     assert Child.__class_objects_map__ is Parent.__class_objects_map__
+
+
+def test_sibling_subclasses_share_id_namespace() -> None:
+    class Rule(Identifiable[str]):
+        @classmethod
+        def make_uid(cls, name: str) -> str:
+            return name
+
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+    class SchemaRule(Rule):
+        pass
+
+    class FreshnessRule(Rule):
+        pass
+
+    schema = SchemaRule('orders')
+    with pytest.raises(DuplicateUIDError, match='duplicate'):
+        FreshnessRule('orders')
+    assert Rule.__class_objects_map__ == {'orders': schema}
 
 
 def test_subclass_with_init_args_can_be_instantiated() -> None:

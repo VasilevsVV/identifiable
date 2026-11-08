@@ -1,20 +1,22 @@
 # AGENTS.md
 
-Operational guide for AI agents working on this repository. Read it at the start of every session. Where it conflicts with general practice, this file wins. If a design decision can't be settled from the code or this file, ask the user.
+Operational guide for AI agents working on this repository. Read it at the start of every session. Where it conflicts with general practice, this file wins. If a design decision can't be settled from the code, this file or `docs/adr/`, ask the user.
 
 ---
 
 ## Project
 
-- **Name**: `identifiable` (version 0.1.0, early WIP on the `prototype` branch)
-- **What it is**: a mixin for Python 3.10+. Subclasses get unique per-object IDs (made by their own `make_uid()`) and a class-level registry of instances.
-- **Goal**: a reliable, testable mixin that doesn't surprise subclasses or break inheritance chains.
+- **Name**: `identifiable` (version 0.1.0, early WIP)
+- **What it is**: a mixin for Python 3.10+. It gives a family of classes one interface to make an ID for each object (`make_uid()`), register the object under it, reject duplicates and look objects up by ID.
+- **Goal**: easy to add to existing classes: add `Identifiable` to the bases and implement `make_uid()`. It must stay reliable and testable, and must not surprise subclasses or break inheritance chains.
+- **Scope**: user code owns creating objects, lazy creation and resolving ID references. The mixin only makes, registers and looks up IDs.
+- **Docs**: `README.md` holds the purpose, use cases and public interface (including planned features). `GLOSSARY.md` holds the domain terms; use them when naming things in code, docs and commits. `docs/adr/` records design decisions; read it before changing registry sharing or adding a metaclass.
 
 ## How the code works
 
 Everything lives in `identifiable/core.py`.
 
-- `Identifiable(Generic[_KEY_T])` is the mixin. `_KEY_T` is the ID type (must be `Hashable`). No metaclass.
+- `Identifiable(Generic[_KEY_T])` is the mixin. `_KEY_T` is the ID type (must be `Hashable`). No metaclass (ADR 0002).
 - `make_uid(cls, *args, **kwargs)` is an abstract **classmethod** that subclasses implement. It gets the constructor arguments and returns the new object's ID.
 - `uid` is a read-only property that returns the stored ID (`_Identifiable__uid`).
 - `__class_objects_map__: dict` is the registry, the only class setting.
@@ -24,8 +26,8 @@ Everything lives in `identifiable/core.py`.
   3. Raises `DuplicateUIDError` (a `ValueError`) if the ID is already registered. No object is created.
   4. Creates the object, stores the ID, registers it in `cls.__class_objects_map__`.
   `__init__` then runs as usual with the same arguments.
-- `__init_subclass__` only acts on **direct** subclasses (`Identifiable in cls.__bases__`): it creates a fresh `__class_objects_map__`, or checks that a user-provided one is a `dict`. Deeper subclasses **share their parent's registry**.
-- `get_object` is a **stub** (`...`).
+- `__init_subclass__` only acts on **direct** subclasses (`Identifiable in cls.__bases__`): it creates a fresh `__class_objects_map__`, or checks that a user-provided one is a `dict`. Deeper subclasses **share their parent's registry** on purpose: the direct subclass is the family base, and the whole family has one ID namespace (ADR 0001).
+- `get_object` is a **stub** (`...`). Its planned contract is in README.md's Interface section. The stub's `-> Self` return type doesn't match that contract yet (it should be the family base).
 - There is no built-in ID generation. It may come back later as a separate class.
 - Names that start with two underscores and don't end with two (for example `__uid`) are name-mangled to `_Identifiable__*`. Subclasses can't override them by their plain names.
 
@@ -91,12 +93,14 @@ identifiable/
   __init__.py      # public exports: Identifiable, DuplicateUIDError
   core.py          # Identifiable mixin, DuplicateUIDError
 test/              # unit tests: test_*.py or *_test.py
+docs/adr/          # design decisions
+GLOSSARY.md        # domain terms
 pyproject.toml  ruff.toml  makefile  .bumpversion.cfg
 ```
 
 ## Vocabulary
 
-Use these terms in design discussions:
+Domain terms (ID, family, registry, ID reference, ...) live in `GLOSSARY.md`. Use these design terms in design discussions:
 
 - **Module**: anything with an interface and an implementation (a class, a method, a package).
 - **Interface**: everything a caller must know: signatures, invariants, error modes, ordering, configuration.
@@ -143,9 +147,9 @@ Use these terms in design discussions:
 These are documented so they don't get rediscovered. Fix them only when the task calls for it.
 
 - `get_object` is unimplemented and returns `None`.
-- Indirect subclasses share their direct parent's registry. It's undecided whether this is intended.
 - An object is registered before `__init__` runs. If `__init__` raises, the registry still holds it.
-- pyright doesn't flag a missing `make_uid()`: it only checks abstract methods under `ABCMeta`, and the mixin is deliberately metaclass-free. A pyright-only `ABCMeta` was considered and rejected, because pyright then reports false metaclass conflicts (e.g. with Django or SQLAlchemy models). A missing `make_uid()` is only a runtime `TypeError`.
+- `copy.copy`, `copy.deepcopy` and `pickle` fail with `TypeError`: they call `cls.__new__(cls)` without arguments, so `make_uid()` gets none. A fix still needs a design (a copy would also be a duplicate).
+- pyright doesn't flag a missing `make_uid()`; it's only a runtime `TypeError`. This follows from staying metaclass-free (ADR 0002).
 
 ## Session checklist
 
