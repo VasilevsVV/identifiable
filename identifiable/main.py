@@ -53,18 +53,21 @@ class Identifiable(Generic[_KEY_T]):
             super().__init_subclass__(**kw)
             return
 
+        # A real `raise`, not `assert`: asserts are stripped under `python -O`.
         if hasattr(cls, '__class_objects_map__'):
-            assert isinstance(cls.__class_objects_map__, dict), (
-                f'"__class_objects_map__" attribute must be a dict! Got: {cls.__class_objects_map__}'
-            )
+            if not isinstance(cls.__class_objects_map__, dict):
+                raise TypeError(
+                    f'{cls.__name__}.__class_objects_map__ must be a dict, '
+                    f'got {type(cls.__class_objects_map__).__name__}'
+                )
         else:
             cls.__class_objects_map__ = {}
 
         # Identifiable has no ABCMeta, so @abstractmethod isn't enforced by
         # Python. Check by hand that the subclass implements uid().
         if not cls.__enable_auto_id__ and not _has_concrete_uid(cls):
-            raise Exception(  # noqa: TRY002
-                f'Profiling {cls.__name__} has not implementation for method "execute()"!!!'
+            raise TypeError(
+                f'{cls.__name__} must implement uid() or enable __enable_auto_id__'
             )
         super().__init_subclass__(**kw)
 

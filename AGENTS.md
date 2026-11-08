@@ -142,7 +142,6 @@ These are documented so they don't get rediscovered. Fix them only when the task
 
 - `__new__(cls)` takes no arguments, so a subclass whose `__init__` takes arguments fails to instantiate.
 - `__register_unique_id`, `__gen_unique_id` and `get_object` are unimplemented. With auto-ID on, the generated ID is `None`.
-- The error message in `__init_subclass__` says `Profiling ... "execute()"`. It is a copy-paste leftover and should mention `uid()`.
 - Indirect subclasses share their direct parent's registry. It's undecided whether this is intended.
 
 ## Session checklist

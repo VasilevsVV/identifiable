@@ -42,7 +42,7 @@ def test_user_provided_dict_registry_is_kept() -> None:
 
 
 def test_non_dict_registry_is_rejected() -> None:
-    with pytest.raises(AssertionError):
+    with pytest.raises(TypeError, match='must be a dict'):
 
         class A(Identifiable[str]):
             __class_objects_map__ = 'not a dict'  # pyright: ignore[reportAssignmentType]
@@ -55,7 +55,7 @@ def test_non_dict_registry_is_rejected() -> None:
 
 
 def test_missing_uid_raises_when_auto_id_is_off() -> None:
-    with pytest.raises(Exception):  # noqa: B017
+    with pytest.raises(TypeError, match=r'must implement uid\(\)'):
 
         class A(Identifiable[str]):
             __enable_auto_id__ = False
