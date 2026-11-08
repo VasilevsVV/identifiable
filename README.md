@@ -3,6 +3,10 @@
 A mixin for Python 3.10+ that gives every object a unique ID and keeps a
 class-level registry of instances.
 
+The main goal is one universal interface that makes any family of classes
+identifiable by an ID of some type: an `int`, a `str`, or any other hashable
+type.
+
 Add `Identifiable` to a class's bases and it works with no further setup.
 Settings are optional.
 
@@ -51,6 +55,21 @@ Country().uid()  # 'UA'
 
 The type parameter (`Identifiable[int]`, `Identifiable[str]`, ...) is the ID
 type. It must be hashable.
+
+## Interface
+
+What your class defines:
+
+| Method | Required? | Meaning |
+|---|---|---|
+| `uid(self) -> ID` | Only if you own the IDs | Return this object's unique ID. Without it, auto-ID generates one. Defining it turns auto-ID off. |
+
+What the mixin gives you:
+
+| Method | Meaning |
+|---|---|
+| `obj.uid()` | The object's ID: yours, or the generated one. |
+| `Cls.get_object(id)` | Look up an instance by ID in the class's registry (not implemented yet). |
 
 ## Optional settings
 
