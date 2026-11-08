@@ -245,6 +245,57 @@ Connector.get_object(S3Connector)  # planned: the only S3Connector
 PostgresConnector(host='replica.internal')  # raises DuplicateUIDError
 ```
 
+## Adding to existing classes
+
+`Identifiable` has no metaclass and doesn't touch `__init__`, so it fits into
+classes you already have, including ones with their own metaclass. Two steps:
+
+1. Add `Identifiable[<ID type>]` to the class's bases.
+2. Implement `make_uid()` as a classmethod. It receives the same arguments as
+   `__init__`, so give it a matching signature.
+
+It works with dataclasses too:
+
+```python
+from dataclasses import dataclass
+
+from identifiable import Identifiable
+
+
+@dataclass
+class Sensor(Identifiable[str]):
+    serial: str
+    location: str = 'unknown'
+
+    @classmethod
+    def make_uid(cls, serial: str, location: str = 'unknown') -> str:
+        return serial
+
+
+sensor = Sensor('SN-0042', location='roof')
+sensor.uid  # 'SN-0042'
+```
+
+**Copying and pickling don't work yet.** `copy.copy`, `copy.deepcopy` and
+`pickle` create objects without calling the constructor, so `make_uid()` gets
+no arguments and raises `TypeError`. The same goes for anything that pickles
+objects, such as `multiprocessing` queues and pools. See [Roadmap](#roadmap).
+
+## When not to use it
+
+- **Short-lived objects.** The registry keeps every object for as long as the
+  process runs, and nothing is ever removed. Per-request or per-row objects
+  pile up.
+- **Many objects created fast.** Every construction calls `make_uid()` and
+  checks and updates the registry. For thousands to millions of objects, such
+  as tree nodes or linked-list items, that overhead is noticeable.
+- **More than one registry per family.** The registry lives on the class, so a
+  process has exactly one per family. You can't keep a separate registry per
+  tenant, and tests that create objects need their own classes or a cleared
+  registry.
+- **Data behind an ORM.** ORMs such as SQLAlchemy already map primary keys to
+  loaded objects. Use their identity map instead.
+
 ## Interface
 
 What your class defines:
