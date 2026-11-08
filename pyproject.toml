@@ -45,6 +45,7 @@ Issues = "https://github.com/VasilevsVV/identifiable/issues"
 [tool.pyright]
 
 typeCheckingMode = "standard"
+pythonVersion = "3.10"
 
 
 # =================================================================
