@@ -7,9 +7,9 @@ yet. They fail loudly once the behaviour lands, so remove the marker then.
 
 import pytest
 
-from identifiable import Identifiable
+from identifiable import DuplicateUIDError, Identifiable
 
-NOT_IMPLEMENTED = 'registry and get_object are not implemented yet'
+NOT_IMPLEMENTED = 'get_object is not implemented yet'
 
 
 # --- Registry setup ---------------------------------------------------------
@@ -150,16 +150,20 @@ def test_get_object_returns_registered_instance() -> None:
 # --- Duplicate keys ---------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason=NOT_IMPLEMENTED)
 def test_duplicate_key_in_same_registry_is_rejected() -> None:
     class Country(Identifiable[str]):
         @classmethod
         def make_uid(cls) -> str:
             return 'UA'
 
-    Country()
-    with pytest.raises(ValueError, match='duplicate'):
+    first = Country()
+    with pytest.raises(DuplicateUIDError, match='duplicate'):
         Country()
+    assert Country.__class_objects_map__ == {'UA': first}
+
+
+def test_duplicate_uid_error_is_a_value_error() -> None:
+    assert issubclass(DuplicateUIDError, ValueError)
 
 
 def test_same_key_in_separate_registries_is_allowed() -> None:

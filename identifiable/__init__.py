@@ -1,3 +1,3 @@
-from identifiable.core import Identifiable
+from identifiable.core import DuplicateUIDError, Identifiable
 
-__all__ = ['Identifiable']
+__all__ = ['DuplicateUIDError', 'Identifiable']

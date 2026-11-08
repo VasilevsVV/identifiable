@@ -8,6 +8,13 @@ from typing_extensions import Self
 _KEY_T = TypeVar('_KEY_T', bound=Hashable)
 
 
+class DuplicateUIDError(ValueError):
+    """Raised when a new object's ID is already in its class's registry.
+
+    Raised by `Identifiable.__new__`; the registered object is kept.
+    """
+
+
 class Identifiable(Generic[_KEY_T]):
     """Mixin that gives every instance a unique ID and a class-level registry.
 
@@ -38,10 +45,14 @@ class Identifiable(Generic[_KEY_T]):
 
         Raises:
             TypeError: The class doesn't implement `make_uid()`.
+            DuplicateUIDError: The ID is already registered. No instance is
+                created.
         """
         if getattr(cls.make_uid, '__isabstractmethod__', False):
             raise TypeError(f'{cls.__name__} must implement make_uid()')
         uid = cls.make_uid(*args, **kwargs)
+        if uid in cls.__class_objects_map__:
+            raise DuplicateUIDError(f'{cls.__name__}: duplicate uid {uid!r}')
         obj = super().__new__(cls)
         obj.__uid = uid
         cls.__class_objects_map__[uid] = obj
