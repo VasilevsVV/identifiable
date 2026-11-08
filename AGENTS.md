@@ -12,7 +12,7 @@ Operational guide for AI agents working on this repository. Read it at the start
 
 ## How the code works
 
-Everything lives in `identifiable/main.py`.
+Everything lives in `identifiable/core.py`.
 
 - `Identifiable(Generic[_KEY_T])` is the mixin. `_KEY_T` is the ID type (must be `Hashable`).
 - Class flags:
@@ -80,15 +80,15 @@ pip install -e ".[dev]"
 ruff check . && ruff format --check . && pyright && pytest
 ```
 
-`pytest` exits with code 5 while no tests exist. Build and publish with `make build`, `make test-publish` or `make publish`, and only when the user asks.
+Build and publish with `make build`, `make test-publish` or `make publish`, and only when the user asks.
 
 ## Structure
 
 ```
 identifiable/
-  __init__.py      # public exports (currently empty)
-  main.py          # Identifiable mixin
-test/              # unit tests (planned): test_*.py or *_test.py
+  __init__.py      # public exports: Identifiable
+  core.py          # Identifiable mixin
+test/              # unit tests: test_*.py or *_test.py
 pyproject.toml  ruff.toml  makefile  .bumpversion.cfg
 ```
 
@@ -132,7 +132,7 @@ Use these terms in design discussions:
 
 - **Style**: single quotes, 4-space indent, and the `ruff.toml` rules.
 - **Types**: annotate functions, return types and non-obvious variables. Import `Self` and other newer typing features from `typing_extensions`.
-- **Package**: core logic stays in `main.py`. Export only stable public names from `__init__.py`.
+- **Package**: core logic stays in `core.py`. Export only stable public names from `__init__.py`.
 - **Dependencies**: runtime needs only `typing_extensions`. Ask before adding any other dependency.
 - **Commits**: use conventional commits (`feat:`, `fix:`, `refactor:`, `test:`, `chore:`). Bump versions only in dedicated release PRs.
 

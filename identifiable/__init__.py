@@ -1,3 +1,3 @@
-from identifiable.main import Identifiable
+from identifiable.core import Identifiable
 
 __all__ = ['Identifiable']
