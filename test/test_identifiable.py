@@ -6,6 +6,7 @@ yet. They fail loudly once the behaviour lands, so remove the marker then.
 """
 
 import pytest
+from typing_extensions import assert_type
 
 from identifiable import DuplicateUIDError, Identifiable, UnknownUIDError
 
@@ -153,6 +154,28 @@ def test_get_object_raises_unknown_uid_error_for_unknown_id() -> None:
     with pytest.raises(UnknownUIDError, match="^Country: unknown uid 'PL'$"):
         Country.get_object('PL')
     assert issubclass(UnknownUIDError, KeyError)
+
+
+def test_get_object_on_family_base_finds_any_family_member() -> None:
+    class Rule(Identifiable[str]):
+        @classmethod
+        def make_uid(cls, name: str) -> str:
+            return name
+
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+    class SchemaRule(Rule):
+        pass
+
+    class FreshnessRule(Rule):
+        pass
+
+    schema = SchemaRule('orders_schema')
+    fresh = FreshnessRule('orders_fresh')
+    assert Rule.get_object('orders_schema') is schema
+    assert Rule.get_object('orders_fresh') is fresh
+    assert_type(Rule.get_object('orders_fresh'), Rule)
 
 
 # --- Duplicate keys ---------------------------------------------------------
